@@ -57,7 +57,8 @@ export function botMessageAllowsSilence(
   intent: BotMessageIntent | undefined,
   repliesToRequest = false,
 ): boolean {
-  return intent === "fyi" && !repliesToRequest;
+  // Statuses are internal coordination; a result may wait for other delegated work.
+  return intent === "status" || intent === "result" || (intent === "fyi" && !repliesToRequest);
 }
 
 /** Resolve a target by id first, then by exact name, then case-insensitively. */
@@ -113,7 +114,7 @@ export function renderBotDirectory(bots: readonly BotAddress[]): string | undefi
     "<teammate_directory>",
     ...formatBotRosterLines(bots),
     "</teammate_directory>",
-    "Use message_bot for useful updates, questions, and results. Delivery is async and does not end your turn. Continue independent work; do not poll or send ack-only messages. Later updates only if they add something new.",
+    "Use message_bot to assign work, ask blocking questions and return verified results. Delivery is async and does not end your turn. Continue independent work; do not poll, send ack-only messages or narrate routine progress. Later updates only if they add something new.",
   ].join("\n");
 }
 
@@ -195,8 +196,10 @@ export function buildBotMessageWakePrompt(args: {
   const label = safeName.replaceAll('"', "");
   const intent = args.intent ?? "request";
   const action =
-    intent === "result" || intent === "status"
-      ? `This is a ${intent} for work you delegated. Relay it to the user now, and include the actual substance — the real names, dates, numbers, and details ${safeName} sent — not just a note that a ${intent} arrived. A reply like "the summary came through" or "it's done" without repeating what it says is not acceptable. Do not stay silent and do not merely acknowledge it.`
+    intent === "result"
+      ? "This is a completed result from delegated work. Incorporate the real evidence and details into the original objective. If other specialist work needed for that goal is still outstanding, continue coordinating internally without sending a premature user-facing message. A silent turn must reply with exactly NO_RESPONSE. When the requested outcome is complete, provide ONE consolidated final answer with all findings and genuine blockers. Never post an acknowledgement or a repetitive progress report."
+      : intent === "status"
+        ? "This is an intermediate delegated-work status, NOT a completed result. Do not relay ordinary progress to the owner, echo the status, or send message_user progress updates. Continue coordinating as needed. Unless a genuinely urgent owner decision blocks progress, the entire reply must be exactly NO_RESPONSE."
       : intent === "question"
         ? `This is a question about delegated work. Answer it if you can, then continue the coordination and keep the user informed.`
         : intent === "fyi"

@@ -60,6 +60,8 @@ export function runReplyMode(
 
 export function runReplyGuidance(trigger: string, replyMode: ReplyMode = "chat"): string {
   if (replyMode === "messages") return messagesModeReplyGuidance();
+  if (trigger === "bot_message")
+    return "This is internal bot coordination. Do not send message_user updates or acknowledgements for ordinary specialist progress. Continue useful work; give the owner a consolidated final reply only when the requested outcome is complete. Ask the owner only about a genuine blocker.";
   if (trigger === "reaction") return REACTION_SILENT_REPLY_GUIDANCE;
   if (isBackgroundRunTrigger(trigger)) return TICKET_SILENT_REPLY_GUIDANCE;
   return runAllowsSilentEmpty(trigger) ? ROUTINE_SILENT_REPLY_GUIDANCE : longWorkProgressGuidance();

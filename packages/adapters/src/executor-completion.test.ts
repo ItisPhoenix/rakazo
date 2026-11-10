@@ -37,6 +37,15 @@ import {
 } from "./silent-reply.js";
 import { finalBlocksAfterMidTurnProgress } from "./user-progress.js";
 
+describe("internal bot-message reply guidance", () => {
+  it("discourages interim progress and requests a consolidated outcome", () => {
+    const guidance = runReplyGuidance("bot_message");
+    expect(guidance).toContain("internal bot coordination");
+    expect(guidance).toContain("consolidated final reply");
+    expect(guidance).not.toContain("tell the person right away");
+  });
+});
+
 describe("completionMessageSegments", () => {
   it("keeps visible tool activity without appending a generic completion claim", () => {
     const steps = [{ kind: "steps" as const, steps: [{ label: "Message bot", count: 1 }] }];
