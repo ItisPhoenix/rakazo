@@ -1864,6 +1864,34 @@ describe("dockerComputerToolInstruction", () => {
     expect(dockerComputerToolInstruction("e2b")).toBeUndefined();
   });
 
+  it("describes Docker computer limitations only when shell is offered", () => {
+    const hiddenShell = dockerComputerToolInstruction(
+      "docker",
+      undefined,
+      new Set(["browser_navigate", "browser_snapshot"]),
+    );
+    expect(hiddenShell).not.toContain("Debian bookworm");
+    const offeredShell = dockerComputerToolInstruction(
+      "docker",
+      undefined,
+      new Set(["shell", "browser_navigate", "browser_snapshot"]),
+    );
+    expect(offeredShell).toContain("Debian bookworm");
+    expect(offeredShell).toContain("no sudo");
+    expect(offeredShell).toContain("uv");
+  });
+
+  it("does not change the legacy instructions when shell is disabled", () => {
+    expect(
+      dockerComputerToolInstruction(
+        "docker",
+        new Set(["shell", "browser_navigate", "browser_act", "request_takeover"]),
+      ),
+    ).toBe(
+      "For Python CLI tools, use `uv tool install <package>`; it installs without sudo and keeps tools under this computer's persistent home. GitHub's `gh` CLI is installed. `pdftotext`, `pandoc`, and `openpyxl` are available to extract text from PDFs, documents, and spreadsheets. Never use `--with-token` or inject a token through the environment.",
+    );
+  });
+
   it("documents gh CLI device-flow login without token injection", () => {
     const instruction = dockerComputerToolInstruction("docker");
     expect(instruction).toContain("gh auth login");
