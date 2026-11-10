@@ -330,19 +330,30 @@ describe("strategic initiative tool guard", () => {
     ).toBe(false);
   });
 
-  it("keeps only safe user-facing tools for strategic initiative runs", () => {
+  it("allows local work and research but not external-account mutations", () => {
     const tools = [
       { name: "ask_user" },
       { name: "message_user" },
-      { name: "computer_shell" },
+      { name: "shell" },
+      { name: "browser_snapshot" },
+      { name: "web_search" },
+      { name: "run_subagent" },
       { name: "gmail_send" },
+      { name: "request_purchase" },
     ];
     expect(
       filterStrategicInitiativeTools(tools, {
         trigger: "routine",
         clientNonce: "strategic-initiative:bot-1:123",
       }).map((tool) => tool.name),
-    ).toEqual(["ask_user", "message_user"]);
+    ).toEqual([
+      "ask_user",
+      "message_user",
+      "shell",
+      "browser_snapshot",
+      "web_search",
+      "run_subagent",
+    ]);
   });
 
   it("does not filter regular runs", () => {
@@ -434,15 +445,31 @@ it("escapes scratchpad data and keeps instructions outside its wrapper", async (
 });
 
 it.each([
-  "computer_shell",
+  "shell",
   "browser_act",
-  "cloud_agent_start",
+  "computer_act",
   "load_skill",
+  "web_search",
+  "run_subagent",
+  "scratchpad_complete",
+])("allows %s for autonomous progress at dispatch", (name) => {
+  expect(
+    strategicInitiativeToolAllowed(name, {
+      trigger: "routine",
+      clientNonce: "strategic-initiative:bot-1:1",
+    }),
+  ).toBe(true);
+});
+
+it.each([
+  "cloud_agent_start",
   "spawn_agent",
   "update_bot",
   "gmail_send",
+  "send_email",
+  "request_purchase",
   "catalog_execute",
-])("denies %s at the shared dispatch boundary", (name) => {
+])("keeps %s outside the autonomous tool boundary", (name) => {
   expect(
     strategicInitiativeToolAllowed(name, {
       trigger: "routine",
