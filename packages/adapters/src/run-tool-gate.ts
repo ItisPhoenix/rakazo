@@ -80,6 +80,7 @@ import { callPaidService } from "./run-tools-integrations.js";
 import { USER_COMPUTER_TOOLS, userComputerGate } from "./run-tools-user-computer.js";
 import { connectorTrustKeys } from "./run-trust.js";
 import { watchFromTool } from "./schedule-tools.js";
+import { isStrategicInitiativeRun, strategicInitiativeToolAllowed } from "./strategic-initiative.js";
 import { pagePaymentPrecheck, paysWithWallet } from "./spending-gate.js";
 
 export type AppliedEffect = Awaited<ReturnType<typeof recordEffect>>;
@@ -180,6 +181,23 @@ export async function gateToolCall(
     toolName === approvalName || toolName === name || declaredReadOnly === false
       ? declaredReadOnly
       : ctx.tools.connector.get(toolName)?.readOnly;
+  // Discovery is not an authorization bypass. Recheck resolved actions at dispatch,
+  // including catalog-loaded and batch connector tools, before an effect is claimed.
+  if (
+    isStrategicInitiativeRun(run) &&
+    (unidentifiedAction ||
+      !strategicInitiativeToolAllowed(name, run, declaredReadOnly) ||
+      approvalToolNames.some(
+        (toolName) =>
+          !strategicInitiativeToolAllowed(toolName, run, declaredReadOnlyFor(toolName)),
+      ))
+  ) {
+    return {
+      result: {
+        error: "This unattended run cannot use an unclassified or mutating tool. Ask the owner to start that action explicitly.",
+      },
+    };
+  }
   const requiresUnattendedApproval =
     !catalogControlRead &&
     ((unidentifiedAction && run.trigger === "webhook") ||
