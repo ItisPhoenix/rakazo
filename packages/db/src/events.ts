@@ -133,6 +133,8 @@ export interface ClearThreadResult {
 
 export interface FinalizeRunResult {
   continuationRunId: string | null;
+  /** A delegated turn was completed without publishing another owner-facing reply. */
+  replySuppressed?: boolean;
 }
 
 interface FinalizeRunBase {
@@ -691,7 +693,10 @@ export async function finalizeRun(
     "bot.id": input.botId,
   });
   void captureRunAnalytics(prisma, analytics, input.runId, `run.${input.outcome}`);
-  return { continuationRunId: committed.continuationRunId };
+  return {
+    continuationRunId: committed.continuationRunId,
+    ...(committed.replySuppressed ? { replySuppressed: true } : {}),
+  };
 }
 
 /** Stamps one turn-level wall-clock duration on the final tool block. */
@@ -872,6 +877,7 @@ async function finalizeRunOnce(
   seq: number;
   continuationRunId: string | null;
   firstResponse: boolean;
+  replySuppressed?: boolean;
 } | null> {
   return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     await tx.$queryRaw`SELECT id FROM threads WHERE id = ${input.threadId} FOR UPDATE`;
@@ -958,6 +964,7 @@ async function finalizeRunOnce(
     let firstResponse = false;
     const gate =
       input.outcome === "completed" ? await delegatedReplyGate(tx, input) : null;
+    let replySuppressed = gate?.suppress === true;
     let replyBlocks =
       input.outcome === "completed"
         ? completedRunBlocks(input.blocks, writableRun?.startedAt ?? null, now)
@@ -981,7 +988,10 @@ async function finalizeRunOnce(
         },
         select: { id: true },
       });
-      if (prior) replyBlocks = [];
+      if (prior) {
+        replyBlocks = [];
+        replySuppressed = true;
+      }
     }
     if (replyBlocks.length > 0) {
       const message = await createThreadMessageInTransaction(tx, {
@@ -1034,7 +1044,13 @@ async function finalizeRunOnce(
     }
     const continuationRunId = await createPendingSteeringRun(tx, input);
     await tx.bot.update({ where: { id: input.botId }, data: { updatedAt: now } });
-    return { threadId: lastEvent.threadId, seq: lastEvent.seq, continuationRunId, firstResponse };
+    return {
+      threadId: lastEvent.threadId,
+      seq: lastEvent.seq,
+      continuationRunId,
+      firstResponse,
+      ...(replySuppressed ? { replySuppressed: true } : {}),
+    };
   }, FINALIZE_TRANSACTION_OPTIONS);
 }
 
