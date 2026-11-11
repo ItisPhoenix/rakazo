@@ -149,7 +149,8 @@ export function HonchoSettingsForm({ busy, onConnect }: MemoryProviderSettingsFo
         </select>
         <p className="mt-2 text-body-sm text-muted-foreground">
           <Trans>
-            Choose how this Space searches memories. An external user peer always uses reasoned recall.
+            Choose how this Space searches memories. An external user peer always uses reasoned
+            recall.
           </Trans>
         </p>
       </Field>
