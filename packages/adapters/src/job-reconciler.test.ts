@@ -952,7 +952,7 @@ describe("createJobReconciler", () => {
     );
   });
 
-  it("returns progress-only transcripts as status", async () => {
+  it("returns completed progress-only transcripts as terminal blockers", async () => {
     const terminalRun = {
       id: "run-progress",
       spaceId: "workspace-1",
@@ -994,13 +994,13 @@ describe("createJobReconciler", () => {
       { prisma, jobs, events },
       terminalRun,
       { id: "bot-1", name: "Researcher" },
-      "Checking calendars…",
-      "status",
+      "The delegated bot finished, but only progress updates were recorded. No final summary is available.",
+      "result",
       { forceUnread: false },
     );
   });
 
-  it.each(["cancelled", "failed"])("returns a %s peer run as unread status", async (status) => {
+  it.each(["cancelled", "failed"])("returns a %s peer run as unread terminal result", async (status) => {
     const terminalRun = {
       id: "run-stuck",
       spaceId: "workspace-1",
@@ -1037,7 +1037,7 @@ describe("createJobReconciler", () => {
       status === "failed"
         ? `Could not complete the delegated request: ${stuckWorkStatusMessages()[0]}`
         : stuckWorkStatusMessages()[0],
-      "status",
+      "result",
       { forceUnread: true },
     );
     expect(prisma.message.findMany).not.toHaveBeenCalledWith(
