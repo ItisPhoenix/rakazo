@@ -12,6 +12,7 @@ import android.bluetooth.BluetoothProfile
 import android.bluetooth.BluetoothStatusCodes
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
+import android.bluetooth.le.ScanSettings
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
@@ -33,6 +34,9 @@ class RakazoWristModule : Module() {
   private val main = Handler(Looper.getMainLooper())
   private var scanCallback: ScanCallback? = null
   private var scanGeneration = 0
+  // Kept in memory for this short, owner-initiated scan only.
+  private val seenScanAddresses = LinkedHashSet<String>()
+  private var nearbyCandidateCount = 0
   private var gatt: BluetoothGatt? = null
   private var writeCharacteristic: BluetoothGattCharacteristic? = null
   private var notifyCharacteristic: BluetoothGattCharacteristic? = null
@@ -137,8 +141,46 @@ class RakazoWristModule : Module() {
     sendEvent("onWristState", mapOf("status" to "error", "reason" to message))
   }
 
+  /**
+   * Many KaHa watches omit the local name in advertisements. Show nearby candidates locally,
+   * but NEVER treat an advertisement as proof of watch identity. GATT model WA49V3 must match.
+   * No addresses, names or scan records leave this Android app.
+   */
+  private fun reportScanCandidate(result: ScanResult) {
+    val address = result.device.address
+    if (seenScanAddresses.contains(address)) return
+    val rawName = result.scanRecord?.deviceName
+      ?: runCatching { result.device.name }.getOrNull()
+      ?: ""
+    val displayName = rawName.trim().filterNot { Character.isISOControl(it) }.take(40)
+    val name = displayName.uppercase(Locale.ROOT)
+    val uartAdvertised = result.scanRecord?.serviceUuids?.any { it.uuid == UART_SERVICE } == true
+    val likely = name.startsWith("LDISCOVERY") || name.contains("LUNAR") ||
+      name.startsWith("WA49") || uartAdvertised
+
+    // Discard weak, unrecognized ambient BLE traffic and bound UI/device scanning work.
+    // Keep extra room for positively named/advertised watch candidates.
+    if (!likely && result.rssi < -85) return
+    if (!likely && nearbyCandidateCount >= 24) return
+    if (seenScanAddresses.size >= 40) return
+    if (!seenScanAddresses.add(address)) return
+    if (!likely) nearbyCandidateCount++
+
+    sendEvent(
+      "onWristDevice",
+      mapOf(
+        "name" to (displayName.ifEmpty { "Unnamed nearby BLE device" }),
+        "address" to address, // local JS state only, never included in displayed text or sent to API
+        "rssi" to result.rssi,
+        "likelyWatch" to likely,
+      ),
+    )
+  }
+
   private fun beginScan() {
     endScan()
+    seenScanAddresses.clear()
+    nearbyCandidateCount = 0
     val adapter = manager().adapter
     if (adapter == null || !adapter.isEnabled) {
       fail("Bluetooth is off or unavailable")
@@ -152,12 +194,13 @@ class RakazoWristModule : Module() {
     val callback = object : ScanCallback() {
       override fun onScanResult(callbackType: Int, result: ScanResult) {
         main.post {
-          if (scanCallback !== this) return@post
-          val name = result.scanRecord?.deviceName ?: return@post
-          val normalized = name.uppercase(Locale.ROOT)
-          if (!normalized.startsWith("LDISCOVERY")) return@post
-          // Address is delivered only to the app UI for an explicit local selection.
-          sendEvent("onWristDevice", mapOf("name" to name, "address" to result.device.address))
+          if (scanCallback === this) reportScanCandidate(result)
+        }
+      }
+
+      override fun onBatchScanResults(results: MutableList<ScanResult>) {
+        main.post {
+          if (scanCallback === this) results.forEach { reportScanCandidate(it) }
         }
       }
 
@@ -165,13 +208,17 @@ class RakazoWristModule : Module() {
         main.post {
           if (scanCallback !== this) return@post
           endScan()
-          fail("BLE scan failed")
+          fail("BLE scan failed (code $errorCode)")
         }
       }
     }
     scanCallback = callback
     try {
-      scanner.startScan(callback)
+      val settings = ScanSettings.Builder()
+        .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+        .setReportDelay(0L)
+        .build()
+      scanner.startScan(null, settings, callback)
       state("scanning")
       val generation = ++scanGeneration
       main.postDelayed({
@@ -179,10 +226,13 @@ class RakazoWristModule : Module() {
           endScan()
           state("scan-complete")
         }
-      }, 12_000L)
+      }, 15_000L)
     } catch (_: SecurityException) {
       endScan()
       fail("Bluetooth permission revoked")
+    } catch (_: IllegalStateException) {
+      endScan()
+      fail("Bluetooth scanner is unavailable")
     }
   }
 
