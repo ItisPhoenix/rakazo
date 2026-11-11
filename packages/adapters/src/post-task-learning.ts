@@ -28,6 +28,15 @@ export function isPostTaskReview(run: { trigger: string; clientNonce?: string | 
   return run.trigger === "routine" && Boolean(run.clientNonce?.startsWith(REVIEW_NONCE_PREFIX));
 }
 
+/** The source is supplied by the runtime, never taken from model-authored arguments. */
+export function postTaskReviewSourceRunId(run: {
+  trigger: string;
+  clientNonce?: string | null;
+}): string | undefined {
+  if (!isPostTaskReview(run)) return undefined;
+  return run.clientNonce?.slice(REVIEW_NONCE_PREFIX.length) || undefined;
+}
+
 export function postTaskReviewToolAllowed(name: string): boolean {
   return REVIEW_TOOL_CAPABILITIES.has(name);
 }
