@@ -48,11 +48,11 @@ import {
 } from "./auto-review.js";
 import { reviewWithBackups } from "./auto-review-backups.js";
 import { RAKAZO_DOCS_URLS } from "./builtin-skills.js";
-import { isPostTaskReview, postTaskReviewToolAllowed } from "./post-task-learning.js";
 import type { ExecutorDeps } from "./executor-deps.js";
 import { CATALOG_LOAD, CATALOG_SEARCH } from "./lazy-tool-catalog.js";
 import { findConnectedModelCredential } from "./model-selection.js";
 import { paidRequestEffect } from "./paid-request.js";
+import { isPostTaskReview, postTaskReviewToolAllowed } from "./post-task-learning.js";
 import type { PurchaseApproval } from "./purchase-gate.js";
 import { PURCHASE_CHECKED_TOOLS, purchaseApprovalOf } from "./purchase-gate.js";
 import { autoReviewCheckerProvider } from "./run-auto-review.js";
