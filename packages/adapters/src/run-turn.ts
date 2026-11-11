@@ -39,6 +39,7 @@ import {
   shouldEnqueueCompaction,
 } from "./history-compaction.js";
 import { connectorStepNames } from "./pi-runtime-tools.js";
+import { isPostTaskReview, queuePostTaskReview } from "./post-task-learning.js";
 import {
   backOffRoutineAfterAccountError,
   clearRoutineBackoff,
@@ -854,13 +855,14 @@ export async function completeRun(ctx: RunContext) {
       skipEmptyFallback: reply.publishedTerminalSubagent || reply.publishedMidTurnUserMessage,
     });
   }
-  const blocks = ctx.state.handedOff
+  const internalLearningReview = isPostTaskReview(run);
+  const blocks = ctx.state.handedOff || internalLearningReview
     ? []
     : finalBlocksAfterMidTurnProgress(
         redactBlocks(completionBlocks, ctx.secrets),
         reply.publishedMidTurnUserMessage || runAllowsSilentEmpty(run.trigger),
       );
-  const text = ctx.state.handedOff
+  const text = ctx.state.handedOff || internalLearningReview
     ? ""
     : redactSecrets(completionNotificationBody(silentReply.assembled, blocks), ctx.secrets);
   if (containsSecret(text, ctx.secrets)) {
@@ -902,6 +904,19 @@ export async function completeRun(ctx: RunContext) {
   });
   if (!completed) return;
   ctx.stopHeartbeatAfterCompletion();
+  // Never delay a completed user request to perform learning. The background
+  // review is its own durable run and cannot fail or duplicate the original.
+  if (!internalLearningReview) {
+    await queuePostTaskReview(
+      { prisma: deps.prisma, jobs: deps.jobs },
+      {
+        run,
+        didUsefulWork: reply.toolCalls.length > 0,
+        handedOff: ctx.state.handedOff,
+        resultText: text,
+      },
+    ).catch((error) => getLogger().error("post-task review scheduling", error));
+  }
   if (run.trigger === "routine" && run.routineId) {
     await clearRoutineBackoff(deps, { routineId: run.routineId, userId: run.userId });
   }
