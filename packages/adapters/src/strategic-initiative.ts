@@ -16,6 +16,7 @@ import {
   THREAD_LOCK_TRANSACTION_OPTIONS,
 } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
+import { CATALOG_EXECUTE, CATALOG_LOAD, CATALOG_SEARCH } from "./lazy-tool-catalog.js";
 import { modelCreditBillingEnabled } from "./run-model.js";
 import { BUILTIN_AGENT_TOOL_NAMES, READ_ONLY_AGENT_TOOLS } from "./run-tool-selection.js";
 
@@ -218,12 +219,28 @@ export function isStrategicInitiativeRun(input: {
 }
 
 /** Filter the tools actually offered to this bot, using their declared capabilities. */
-export function filterStrategicInitiativeTools<T extends { name: string; readOnly?: boolean }>(
+export function filterStrategicInitiativeTools<
+  T extends {
+    name: string;
+    readOnly?: boolean;
+    route?: { toolName?: string; resourceId?: string };
+  },
+>(
   tools: readonly T[],
   input: { trigger: string; clientNonce: string | null | undefined },
 ): T[] {
   if (!isStrategicInitiativeRun(input)) return [...tools];
-  return tools.filter((tool) => strategicInitiativeToolAllowed(tool.name, input, tool.readOnly));
+  return tools.filter((tool) => {
+    // Catalog metadata is read-only. Execution routes are offered but checked
+    // against the *resolved action* at dispatch, never trusted by wrapper name.
+    if (tool.route && !tool.route.resourceId) {
+      if (tool.route.toolName === CATALOG_EXECUTE) return true;
+      if (tool.route.toolName === CATALOG_SEARCH || tool.route.toolName === CATALOG_LOAD) {
+        return tool.readOnly === true;
+      }
+    }
+    return strategicInitiativeToolAllowed(tool.name, input, tool.readOnly);
+  });
 }
 
 /** Fail closed on unclassified tools, including discovered connector writes. */
