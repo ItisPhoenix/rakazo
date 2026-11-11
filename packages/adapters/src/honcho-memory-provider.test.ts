@@ -986,6 +986,15 @@ describe("Honcho local mode", () => {
     });
   }
 
+  it("validates recall strategy rather than silently accepting a typo", () => {
+    expect(() =>
+      createHonchoProvider(
+        { recallStrategy: "unsafe-fallback" },
+        { apiKey: "honcho-admin-token" },
+      ),
+    ).toThrow("recallStrategy must be auto, conclusions, or reasoned");
+  });
+
   it("requires the deployment owner for every mode except Honcho Cloud", () => {
     expect(honchoRequiresPrivateEndpoint({})).toBe(false);
     expect(honchoRequiresPrivateEndpoint({ mode: "cloud" })).toBe(false);
