@@ -34,7 +34,6 @@ const MAX_NOTES_CHARS = 220;
 const PROACTIVE_LOCAL_EFFECTS = new Set([
   "ask_user",
   "message_user",
-  "message_bot",
   "computer_act",
   "browser_navigate",
   "browser_act",
