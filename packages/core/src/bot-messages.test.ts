@@ -38,12 +38,12 @@ describe("bot message text", () => {
 describe("Unicode boundaries", () => {
   it("keeps surrogate pairs intact within the bot message limit", () => {
     const emoji = "\u{1f600}";
-    expect(clampBotMessage("a".repeat(7998) + emoji)).toBe("a".repeat(7998) + emoji);
-    expect(clampBotMessage("a".repeat(7998) + emoji + "x")).toBe("a".repeat(7998) + "\u2026");
-    expect(clampBotMessage("a".repeat(7997) + emoji + "xx")).toBe(
-      "a".repeat(7997) + emoji + "\u2026",
-    );
-    expect(clampBotMessage("a".repeat(7998) + "  xx")).toBe("a".repeat(7998) + "\u2026");
+    const a7998 = "a".repeat(7998);
+    const a7997 = "a".repeat(7997);
+    expect(clampBotMessage(`${a7998}${emoji}`)).toBe(`${a7998}${emoji}`);
+    expect(clampBotMessage(`${a7998}${emoji}x`)).toBe(`${a7998}\u2026`);
+    expect(clampBotMessage(`${a7997}${emoji}xx`)).toBe(`${a7997}${emoji}\u2026`);
+    expect(clampBotMessage(`${a7998}  xx`)).toBe(`${a7998}\u2026`);
   });
 
   it("keeps descriptions well formed at individual and shared roster limits", () => {
@@ -56,9 +56,10 @@ describe("Unicode boundaries", () => {
     ]);
     expect(lines[2]).toBe("- C (id: c)");
     expect(lines[3]).toBe("- D (id: d): z");
+    const a3999 = "a".repeat(3999);
     expect(
-      formatBotRosterLines([{ id: "a", name: "A", description: "a".repeat(3999) + emoji }])[0],
-    ).toBe("- A (id: a): " + "a".repeat(3999));
+      formatBotRosterLines([{ id: "a", name: "A", description: `${a3999}${emoji}` }])[0],
+    ).toBe(`- A (id: a): ${a3999}`);
   });
 });
 
