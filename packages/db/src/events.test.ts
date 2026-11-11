@@ -14,6 +14,7 @@ import {
   appendEvent,
   clearThread,
   completedRunBlocks,
+  consolidatedDelegationReady,
   finalizeRun,
   sendUserMessage,
 } from "./events.js";
@@ -79,6 +80,104 @@ function event(seq: number) {
     createdAt: new Date("2026-08-15T12:00:00.000Z"),
   };
 }
+
+describe("single owner reply for delegated results", () => {
+  const sent = [
+    {
+      id: "to-gary",
+      blocks: [
+        {
+          kind: "bot_message_sent" as const,
+          toBotId: "gary",
+          toBotName: "Gary",
+          text: "Review implementation",
+          intent: "request" as const,
+        },
+      ],
+    },
+    {
+      id: "to-ivy",
+      blocks: [
+        {
+          kind: "bot_message_sent" as const,
+          toBotId: "ivy",
+          toBotName: "Ivy",
+          text: "Review security recommendations",
+          intent: "request" as const,
+        },
+      ],
+    },
+  ];
+  const garyResult = {
+    id: "from-gary",
+    seq: 20,
+    replyToMessageId: "to-gary",
+    blocks: [
+      {
+        kind: "bot_message_received" as const,
+        fromBotId: "gary",
+        fromBotName: "Gary",
+        text: "Found implementation",
+        hop: 2,
+        intent: "result" as const,
+      },
+    ],
+  };
+  const ivyResult = {
+    id: "from-ivy",
+    seq: 21,
+    replyToMessageId: "to-ivy",
+    blocks: [
+      {
+        kind: "bot_message_received" as const,
+        fromBotId: "ivy",
+        fromBotName: "Ivy",
+        text: "Found security guidance",
+        hop: 2,
+        intent: "result" as const,
+      },
+    ],
+  };
+
+  it("holds the owner reply until both specialists return terminal results", () => {
+    expect(consolidatedDelegationReady(sent, [], garyResult.id)).toBe(false);
+    expect(consolidatedDelegationReady(sent, [garyResult], garyResult.id)).toBe(false);
+    expect(consolidatedDelegationReady(sent, [garyResult, ivyResult], ivyResult.id)).toBe(true);
+  });
+
+  it("does not publish from an earlier out-of-order wake-up", () => {
+    expect(consolidatedDelegationReady(sent, [garyResult, ivyResult], garyResult.id)).toBe(false);
+  });
+
+  it("ignores intermediate status and unrelated messages", () => {
+    const progress = {
+      ...ivyResult,
+      id: "ivy-progress",
+      blocks: [{ ...ivyResult.blocks[0]!, intent: "status" as const }],
+    };
+    const unrelated = { ...ivyResult, id: "unrelated", replyToMessageId: "someone-else" };
+    expect(consolidatedDelegationReady(sent, [garyResult, progress], progress.id)).toBe(false);
+    expect(consolidatedDelegationReady(sent, [garyResult, unrelated], unrelated.id)).toBe(false);
+  });
+
+  it("treats an explicit terminal failure as a reported blocker", () => {
+    const failed = {
+      ...ivyResult,
+      blocks: [
+        {
+          ...ivyResult.blocks[0]!,
+          intent: "status" as const,
+          text: "Could not complete the delegated request: provider unavailable",
+        },
+      ],
+    };
+    expect(consolidatedDelegationReady(sent, [garyResult, failed], failed.id)).toBe(true);
+  });
+
+  it("does not treat zero delegated requests as a completed objective", () => {
+    expect(consolidatedDelegationReady([], [garyResult], garyResult.id)).toBe(false);
+  });
+});
 
 describe("finalizeRun", () => {
   it("stamps the final steps block with wall-clock run duration", () => {

@@ -264,6 +264,14 @@ export const messagingTools: ToolHandlers = {
     const maxLength = messageUserMaxLength();
     const text = clampUserProgressMessage(rawMessage, maxLength);
     if (!text) return call.finish({ error: "message is required" });
+    // Internal delegated work must not publish each peer wake-up to the owner.
+    // Blocking decisions still use ask_user rather than a progress message.
+    if (ctx.run.trigger === "bot_message" || reply.delegatedRequestSent) {
+      return call.finish({
+        ok: true,
+        note: "This owner-facing progress update was held for the consolidated response. Use ask_user only if a real owner decision blocks work.",
+      });
+    }
     const truncated = isProgressMessageTruncated(rawMessage, maxLength);
     await flushProgress(ctx);
     // Text written before an answer to the person's mid-task message doesn't use up the
@@ -331,6 +339,9 @@ export const messagingTools: ToolHandlers = {
       },
     );
     if (!sent.ok) return call.finish({ error: sent.error });
+    if (args.intent === undefined || args.intent === "request" || args.intent === "question") {
+      ctx.state.reply.delegatedRequestSent = true;
+    }
     return call.finish({
       ok: true,
       botId: sent.botId,

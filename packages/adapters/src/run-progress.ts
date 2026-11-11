@@ -164,7 +164,11 @@ export async function publishInterimMessage(ctx: RunContext, text: string, markU
 
 /** Whether text written before a step may be posted as an interim message at all. */
 export function narrationBecomesMessages(ctx: RunContext) {
-  return ctx.replyMode === "chat" && runPromotesMidTurnNarration(ctx.run.trigger);
+  return (
+    ctx.replyMode === "chat" &&
+    !ctx.state.reply.delegatedRequestSent &&
+    runPromotesMidTurnNarration(ctx.run.trigger)
+  );
 }
 
 export function canPublishDurableNarration(ctx: RunContext) {
@@ -228,6 +232,7 @@ export async function flushProgress(ctx: RunContext) {
     ctx.scripted ||
     !reply.pendingProgress ||
     run.trigger === "routine" ||
+    reply.delegatedRequestSent ||
     isBackgroundRunTrigger(run.trigger) ||
     progressHeldForSilence(ctx)
   )

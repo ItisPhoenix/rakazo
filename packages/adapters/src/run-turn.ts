@@ -929,6 +929,7 @@ export async function completeRun(ctx: RunContext) {
   const notifyBody = completionNotificationPreview(text);
   // Agent-to-agent work the chat stays read for is not news to the user either.
   if (
+    !completed.replySuppressed &&
     runSendsFinishNotification(run.trigger) &&
     marksUnread &&
     notifyBody &&

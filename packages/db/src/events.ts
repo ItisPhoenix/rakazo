@@ -133,6 +133,8 @@ export interface ClearThreadResult {
 
 export interface FinalizeRunResult {
   continuationRunId: string | null;
+  /** A delegated turn was completed without publishing another owner-facing reply. */
+  replySuppressed?: boolean;
 }
 
 interface FinalizeRunBase {
@@ -691,7 +693,10 @@ export async function finalizeRun(
     "bot.id": input.botId,
   });
   void captureRunAnalytics(prisma, analytics, input.runId, `run.${input.outcome}`);
-  return { continuationRunId: committed.continuationRunId };
+  return {
+    continuationRunId: committed.continuationRunId,
+    ...(committed.replySuppressed ? { replySuppressed: true } : {}),
+  };
 }
 
 /** Stamps one turn-level wall-clock duration on the final tool block. */
@@ -712,6 +717,151 @@ export function completedRunBlocks(
   );
 }
 
+/**
+ * Complete one owner-started delegation only after every requested bot has returned.
+ * This is intentionally scoped to message_bot requests sent in the original owner run;
+ * ordinary peer messages, group handoffs, and unrelated chat turns are unaffected.
+ */
+export function consolidatedDelegationReady(
+  sent: Array<{ id: string; blocks: MessageBlock[] }>,
+  returned: Array<{
+    id: string;
+    seq: number;
+    replyToMessageId: string | null;
+    blocks: MessageBlock[];
+  }>,
+  currentSourceId: string,
+): boolean {
+  const requests = sent.flatMap((message) =>
+    message.blocks.flatMap((block) =>
+      block.kind === "bot_message_sent" &&
+      (block.intent === undefined || block.intent === "request" || block.intent === "question")
+        ? [{ id: message.id, botId: block.toBotId }]
+        : [],
+    ),
+  );
+  if (!requests.length) return false;
+  const terminal = returned.filter((message) =>
+    message.blocks.some(
+      (block) =>
+        block.kind === "bot_message_received" &&
+        (block.intent === "result" ||
+          (block.intent === "status" &&
+            block.text.startsWith("Could not complete the delegated request:"))) &&
+        requests.some(
+          (request) => request.id === message.replyToMessageId && request.botId === block.fromBotId,
+        ),
+    ),
+  );
+  if (
+    requests.some((request) => !terminal.some((message) => message.replyToMessageId === request.id))
+  )
+    return false;
+  // Only the run awakened by the newest terminal result can see all earlier results.
+  const latest = terminal.reduce((a, b) => (a.seq >= b.seq ? a : b));
+  return latest.id === currentSourceId;
+}
+
+function sentDelegatedRequest(blocks: MessageBlock[]): boolean {
+  return blocks.some(
+    (block) =>
+      block.kind === "bot_message_sent" &&
+      (block.intent === undefined || block.intent === "request" || block.intent === "question"),
+  );
+}
+
+type DelegatedReplyGate = { suppress: boolean; clientNonce?: string };
+
+async function delegatedReplyGate(
+  tx: Prisma.TransactionClient,
+  input: FinalizeRunBase,
+): Promise<DelegatedReplyGate | null> {
+  const current = await tx.run.findUnique({
+    where: { id: input.runId },
+    select: { trigger: true, sourceMessageId: true },
+  });
+  if (!current?.trigger) return null;
+
+  if (current.trigger !== "bot_message") {
+    const ownMessages = await tx.message.findMany({
+      where: { runId: input.runId, threadId: input.threadId },
+      select: { blocks: true },
+    });
+    return ownMessages.some((message) =>
+      sentDelegatedRequest(Array.isArray(message.blocks) ? (message.blocks as MessageBlock[]) : []),
+    )
+      ? { suppress: true }
+      : null;
+  }
+
+  if (!current.sourceMessageId) return null;
+  const source = await tx.message.findUnique({
+    where: { id: current.sourceMessageId },
+    select: { id: true, seq: true, blocks: true, replyToMessageId: true },
+  });
+  if (!source?.replyToMessageId) return null;
+  const incoming = Array.isArray(source.blocks) ? (source.blocks as MessageBlock[]) : [];
+  const fromBotIds = incoming.flatMap((block) =>
+    block.kind === "bot_message_received" ? [block.fromBotId] : [],
+  );
+  if (!fromBotIds.length) return null;
+
+  const originalSend = await tx.message.findUnique({
+    where: { id: source.replyToMessageId },
+    select: { runId: true, threadId: true, blocks: true },
+  });
+  if (
+    !originalSend?.runId ||
+    originalSend.threadId !== input.threadId ||
+    !(
+      Array.isArray(originalSend.blocks) &&
+      (originalSend.blocks as MessageBlock[]).some(
+        (block) =>
+          block.kind === "bot_message_sent" &&
+          fromBotIds.includes(block.toBotId) &&
+          (block.intent === undefined || block.intent === "request" || block.intent === "question"),
+      )
+    )
+  )
+    return null;
+  const originRun = await tx.run.findUnique({
+    where: { id: originalSend.runId },
+    select: { botId: true, threadId: true, trigger: true },
+  });
+  if (
+    !originRun ||
+    originRun.trigger === "bot_message" ||
+    originRun.botId !== input.botId ||
+    originRun.threadId !== input.threadId
+  )
+    return null;
+
+  const sentRows = await tx.message.findMany({
+    where: { runId: originalSend.runId, threadId: input.threadId },
+    select: { id: true, blocks: true },
+  });
+  const sent = sentRows.map((row) => ({
+    id: row.id,
+    blocks: Array.isArray(row.blocks) ? (row.blocks as MessageBlock[]) : [],
+  }));
+  const returnedRows = await tx.message.findMany({
+    where: {
+      threadId: input.threadId,
+      role: "user",
+      replyToMessageId: { in: sent.map((row) => row.id) },
+    },
+    select: { id: true, seq: true, replyToMessageId: true, blocks: true },
+  });
+  const returned = returnedRows.map((row) => ({
+    id: row.id,
+    seq: row.seq,
+    replyToMessageId: row.replyToMessageId,
+    blocks: Array.isArray(row.blocks) ? (row.blocks as MessageBlock[]) : [],
+  }));
+  if (!consolidatedDelegationReady(sent, returned, source.id)) return { suppress: true };
+  return { suppress: false, clientNonce: `charlie:delegation:final:${originalSend.runId}` };
+}
+
 // The thread lock is shared with snapshot reads that may hold it for up to 15s. Prisma's 5s
 // default counts that wait, and expiring would fail a run whose work already finished.
 const FINALIZE_TRANSACTION_OPTIONS = { maxWait: 5_000, timeout: 20_000 };
@@ -724,6 +874,7 @@ async function finalizeRunOnce(
   seq: number;
   continuationRunId: string | null;
   firstResponse: boolean;
+  replySuppressed?: boolean;
 } | null> {
   return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     await tx.$queryRaw`SELECT id FROM threads WHERE id = ${input.threadId} FOR UPDATE`;
@@ -808,10 +959,36 @@ async function finalizeRunOnce(
       });
     }
     let firstResponse = false;
-    const replyBlocks =
+    const gate = input.outcome === "completed" ? await delegatedReplyGate(tx, input) : null;
+    let replySuppressed = gate?.suppress === true;
+    let replyBlocks =
       input.outcome === "completed"
         ? completedRunBlocks(input.blocks, writableRun?.startedAt ?? null, now)
         : (input.partialReply ?? []);
+    if (gate?.suppress) replyBlocks = [];
+    if (gate?.clientNonce && replyBlocks.length === 0) {
+      replyBlocks = [
+        {
+          kind: "text",
+          text: "Delegated work finished, but Charlie did not produce a consolidated answer. Review the specialist results and retry.",
+        },
+      ];
+    }
+    if (gate?.clientNonce) {
+      const prior = await tx.message.findUnique({
+        where: {
+          threadId_clientNonce: {
+            threadId: input.threadId,
+            clientNonce: gate.clientNonce,
+          },
+        },
+        select: { id: true },
+      });
+      if (prior) {
+        replyBlocks = [];
+        replySuppressed = true;
+      }
+    }
     if (replyBlocks.length > 0) {
       const message = await createThreadMessageInTransaction(tx, {
         threadId: input.threadId,
@@ -820,7 +997,10 @@ async function finalizeRunOnce(
         botId: input.botId,
         runId: input.runId,
         ...(input.outcome === "completed"
-          ? { markUnread: input.markUnread }
+          ? {
+              markUnread: input.markUnread,
+              ...(gate?.clientNonce ? { clientNonce: gate.clientNonce } : {}),
+            }
           : { clientNonce: partialReplyClientNonce(input.runId) }),
       });
       const response = await appendEventInTransaction(tx, {
@@ -860,7 +1040,13 @@ async function finalizeRunOnce(
     }
     const continuationRunId = await createPendingSteeringRun(tx, input);
     await tx.bot.update({ where: { id: input.botId }, data: { updatedAt: now } });
-    return { threadId: lastEvent.threadId, seq: lastEvent.seq, continuationRunId, firstResponse };
+    return {
+      threadId: lastEvent.threadId,
+      seq: lastEvent.seq,
+      continuationRunId,
+      firstResponse,
+      ...(replySuppressed ? { replySuppressed: true } : {}),
+    };
   }, FINALIZE_TRANSACTION_OPTIONS);
 }
 
