@@ -338,6 +338,9 @@ describe("strategic initiative tool guard", () => {
       { name: "browser_snapshot" },
       { name: "web_search" },
       { name: "run_subagent" },
+      { name: "github_search_issues", readOnly: true },
+      { name: "github_delete_repo", readOnly: true },
+      { name: "github_list_issues" },
       { name: "gmail_send" },
       { name: "request_purchase" },
     ];
@@ -353,7 +356,18 @@ describe("strategic initiative tool guard", () => {
       "browser_snapshot",
       "web_search",
       "run_subagent",
+      "github_search_issues",
     ]);
+  });
+
+  it("enforces declared read-only connector capability and denies unknown actions", () => {
+    const run = { trigger: "routine", clientNonce: "strategic-initiative:bot-2:6" };
+    expect(strategicInitiativeToolAllowed("github_list_issues", run, true)).toBe(true);
+    expect(strategicInitiativeToolAllowed("github_list_issues", run)).toBe(false);
+    expect(strategicInitiativeToolAllowed("github_delete_repo", run, true)).toBe(false);
+    expect(strategicInitiativeToolAllowed("github_delete_repo", run, false)).toBe(false);
+    expect(strategicInitiativeToolAllowed("not_classified", run, true)).toBe(false);
+    expect(strategicInitiativeToolAllowed("request_purchase", run)).toBe(false);
   });
 
   it("does not filter regular runs", () => {
