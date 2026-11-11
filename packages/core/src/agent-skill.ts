@@ -118,6 +118,22 @@ export function buildSkillMd(input: {
   return `---\n${lines.join("\n")}\n---\n${body.startsWith("\n") ? body : `\n${body}`}`;
 }
 
+/** Preserve the previous usable procedure on every change, so it can be restored. */
+export function archiveSkillContent(files: unknown, previousContent: string): Record<string, string> {
+  const stored: Record<string, string> =
+    files && typeof files === "object" && !Array.isArray(files)
+      ? Object.fromEntries(
+          Object.entries(files).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
+        )
+      : {};
+  const revisions = Object.keys(stored)
+    .map((name) => /^history\/([0-9]+)\.md$/.exec(name))
+    .filter((match): match is RegExpExecArray => match !== null)
+    .map((match) => Number(match[1]));
+  const next = Math.max(0, ...revisions) + 1;
+  return { ...stored, [`history/${next}.md`]: previousContent };
+}
+
 export function skillCatalogLine(entry: Pick<SkillCatalogEntry, "name" | "description">): string {
   return `- ${entry.name}: ${entry.description}`;
 }
