@@ -154,6 +154,8 @@ export type FinalizeRunInput = FinalizeRunBase &
         outcome: "completed";
         blocks: MessageBlock[];
         markUnread?: boolean;
+        /** Durable outbox marker for an internal post-task review, written atomically with completion. */
+        learningReview?: boolean;
       }
     | {
         outcome: "failed";
@@ -1017,7 +1019,12 @@ async function finalizeRunOnce(
       botId: input.botId,
       type: input.outcome === "completed" ? "run.completed" : "run.failed",
       runId: input.runId,
-      payload: input.outcome === "completed" ? {} : { error: input.error },
+      payload:
+        input.outcome === "completed"
+          ? input.learningReview
+            ? { learningReview: true }
+            : {}
+          : { error: input.error },
     });
     await tx.event.deleteMany({
       where: { runId: input.runId, ...transientRunEventsWhere() },
