@@ -5,6 +5,7 @@ import {
 } from "./desktop-command-guard.js";
 import type { ProductEventType } from "@rakazo/contracts";
 import { getLogger } from "@rakazo/logging";
+import { postTaskReviewSourceRunId } from "./post-task-learning.js";
 import type { RunContext } from "./run-context.js";
 import type { ToolHandlers } from "./run-tool-gate.js";
 import {
@@ -321,6 +322,7 @@ export const taskTools: ToolHandlers = {
           description: args.description ? String(args.description) : undefined,
           body: args.body ? String(args.body) : undefined,
           content: args.content ? String(args.content) : undefined,
+          sourceRunId: postTaskReviewSourceRunId(run),
         },
       ),
     );
