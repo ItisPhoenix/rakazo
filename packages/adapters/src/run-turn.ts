@@ -909,8 +909,9 @@ export async function completeRun(ctx: RunContext) {
   if (screenRelease) screenRelease.keepWarm = true;
   await enqueueSteeringContinuation(deps, completed.continuationRunId);
   if (botMessageOutcome) {
-    // Prefer the final reply. If the turn only posted mid-turn progress, return that
-    // text explicitly as status. Delivery uses a stable auto-outcome key; mark
+    // Prefer the final reply. Completed peer turns return a terminal result even
+    // when only progress was recorded, so the coordinator cannot wait forever.
+    // Delivery uses a stable auto-outcome key; mark
     // botOutcomeReturnedAt only after a successful (or intentionally skipped) return
     // so a crash or failed delivery stays visible to the reconciler.
     await returnBotMessageOutcome(
