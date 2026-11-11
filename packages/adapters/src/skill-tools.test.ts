@@ -130,6 +130,27 @@ describe("skill tools", () => {
     });
   });
 
+  it("preserves a usable previous skill after a successful improvement", async () => {
+    await skillCreateFromTool(prisma as never, owner, {
+      name: "Reusable process",
+      description: "A repeatable task",
+      body: "First proven version",
+    });
+    const updated = await skillUpdateFromTool(prisma as never, owner, {
+      name: "Reusable process",
+      body: "Improved version",
+    });
+    expect(updated).toMatchObject({ ok: true });
+    const current = await skillReadFromTool(prisma as never, owner, { name: "Reusable process" });
+    expect(current.files).toEqual(["history/1.md"]);
+    const prior = await skillReadFromTool(prisma as never, owner, {
+      name: "Reusable process",
+      file: "history/1.md",
+    });
+    expect(String(prior.content)).toContain("First proven version");
+    expect(String(current.content)).toContain("Improved version");
+  });
+
   it("lists a skill's reference files and reads one by exact path only", async () => {
     const prisma = makePrisma([
       {
