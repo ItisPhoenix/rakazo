@@ -62,7 +62,9 @@ describe("post-task learning", () => {
         run: { ...source, trigger: "routine", clientNonce: "post-task-review:abc" },
       }),
     ).toBe(false);
-    expect(postTaskReviewEligible({ ...eligible, run: { ...source, trigger: "bot_message" } })).toBe(true);
+    expect(
+      postTaskReviewEligible({ ...eligible, run: { ...source, trigger: "bot_message" } }),
+    ).toBe(true);
   });
 
   it("labels previous output as untrusted evidence instead of an instruction", () => {
