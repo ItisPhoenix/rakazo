@@ -122,6 +122,7 @@ export function createJobReconciler(
     reconcileModelCredits?: () => Promise<void>;
     reconcileRoutineRetryNotices?: () => Promise<void>;
     reconcileStrategicInitiatives?: () => Promise<void>;
+    reconcilePostTaskReviews?: () => Promise<void | number>;
     reconcileSecurityEventRetention?: () => Promise<void>;
     reconcileAuditLog?: () => Promise<void>;
     reconcileHomeStorage?: () => Promise<void>;
@@ -156,6 +157,7 @@ export function createJobReconciler(
     deps.reconcileComputerUpdates,
     deps.reconcileRoutineRetryNotices,
     deps.reconcileStrategicInitiatives,
+    deps.reconcilePostTaskReviews,
     deps.reconcileSecurityEventRetention,
     deps.reconcileAuditLog,
     deps.reconcileHomeStorage,
