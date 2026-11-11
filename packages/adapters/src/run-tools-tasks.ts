@@ -30,6 +30,7 @@ import {
 import {
   skillCreateFromTool,
   skillDeleteFromTool,
+  listAgentSkillRecords,
   skillReadFromTool,
   skillUpdateFromTool,
 } from "./skill-tools.js";
@@ -76,7 +77,7 @@ export async function scheduleCreateRefusal(
 async function recordSkillEvidence(
   ctx: RunContext,
   type: ProductEventType,
-  payload: { skillId?: string; name: string },
+  payload: { skillId?: string },
 ): Promise<void> {
   await ctx.deps.events
     .append({
@@ -90,14 +91,11 @@ async function recordSkillEvidence(
     .catch((error) => getLogger().error("skill evidence append", error));
 }
 
-function successfulSkillChange(result: unknown): { id?: string; name: string } | null {
+function successfulSkillChange(result: unknown): { skillId?: string } | null {
   if (!result || typeof result !== "object") return null;
   const data = result as { ok?: unknown; id?: unknown; name?: unknown };
   if (data.ok !== true || typeof data.name !== "string") return null;
-  return {
-    name: data.name,
-    ...(typeof data.id === "string" ? { skillId: data.id } : {}),
-  };
+  return typeof data.id === "string" ? { skillId: data.id } : {};
 }
 
 /** The task catalog, scratchpad, ticket board, schedules and skills. */
@@ -303,10 +301,16 @@ export const taskTools: ToolHandlers = {
       },
     );
     if (typeof result.name === "string" && !("error" in result)) {
-      await recordSkillEvidence(ctx, "skill.consulted", {
-        name: result.name,
-        ...(typeof args.skillId === "string" ? { skillId: args.skillId } : {}),
+      const records = await listAgentSkillRecords(deps.prisma, {
+        spaceId: run.spaceId,
+        userId: run.userId,
       });
+      const skill = records.find(
+        (entry) => entry.name.toLowerCase() === result.name.toLowerCase(),
+      );
+      if (skill) {
+        await recordSkillEvidence(ctx, "skill.consulted", { skillId: skill.id });
+      }
     }
     return result;
   },
