@@ -60,8 +60,10 @@ export default function CharlieWristScreen() {
       stateSub.remove();
       eventSub.remove();
       // Prototype mode: no hidden/background watch connection after leaving this screen.
-      void wrist.stopScan().catch(() => undefined);
-      void wrist.disconnect().catch(() => undefined);
+      if (wristAvailable()) {
+        void wrist.stopScan().catch(() => undefined);
+        void wrist.disconnect().catch(() => undefined);
+      }
     };
   }, []);
 
@@ -207,7 +209,7 @@ const styles = StyleSheet.create({
   battery: { fontSize: 19, fontWeight: "700" },
   device: { padding: 13, borderWidth: 1, borderRadius: 12, gap: 4 },
   button: { backgroundColor: "#167D7C", paddingVertical: 13, paddingHorizontal: 18, borderRadius: 12, alignItems: "center" },
-  buttonText: { color: "#FFFFFF", fontWeight: "750", fontSize: 14 },
+  buttonText: { color: "#FFFFFF", fontWeight: "700", fontSize: 14 },
   spinner: { marginTop: 4 },
   error: { color: "#CE4E4E", fontSize: 13 },
   footnote: { fontSize: 12, lineHeight: 17, paddingHorizontal: 4 },
