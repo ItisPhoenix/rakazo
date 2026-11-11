@@ -3,6 +3,7 @@ import {
   desktopProtectionGuardMessage,
   protectedComputerLifecycleRefusal,
 } from "./desktop-command-guard.js";
+import { getLogger } from "@rakazo/logging";
 import type { RunContext } from "./run-context.js";
 import type { ToolHandlers } from "./run-tool-gate.js";
 import {
@@ -67,6 +68,34 @@ export async function scheduleCreateRefusal(
       ...scheduleCreateFields(args),
     }));
   return error ? { error } : undefined;
+}
+
+/** Store only skill identity and action evidence, never skill body or credentials. */
+async function recordSkillEvidence(
+  ctx: RunContext,
+  type: string,
+  payload: { skillId?: string; name: string },
+): Promise<void> {
+  await ctx.deps.events
+    .append({
+      spaceId: ctx.run.spaceId,
+      threadId: ctx.thread.id,
+      botId: ctx.bot.id,
+      runId: ctx.runId,
+      type,
+      payload,
+    })
+    .catch((error) => getLogger().error("skill evidence append", error));
+}
+
+function successfulSkillChange(result: unknown): { id?: string; name: string } | null {
+  if (!result || typeof result !== "object") return null;
+  const data = result as { ok?: unknown; id?: unknown; name?: unknown };
+  if (data.ok !== true || typeof data.name !== "string") return null;
+  return {
+    name: data.name,
+    ...(typeof data.id === "string" ? { skillId: data.id } : {}),
+  };
 }
 
 /** The task catalog, scratchpad, ticket board, schedules and skills. */
@@ -262,29 +291,30 @@ export const taskTools: ToolHandlers = {
   async skill_read(ctx, call) {
     const { deps, run } = ctx;
     const { args } = call;
-    return skillReadFromTool(
+    const result = await skillReadFromTool(
       deps.prisma,
-      {
-        spaceId: run.spaceId,
-        userId: run.userId,
-      },
+      { spaceId: run.spaceId, userId: run.userId },
       {
         name: args.name ? String(args.name) : undefined,
         skillId: args.skillId ? String(args.skillId) : undefined,
         file: args.file ? String(args.file) : undefined,
       },
     );
+    if (typeof result.name === "string" && !("error" in result)) {
+      await recordSkillEvidence(ctx, "skill.consulted", {
+        name: result.name,
+        ...(typeof args.skillId === "string" ? { skillId: args.skillId } : {}),
+      });
+    }
+    return result;
   },
   async skill_create(ctx, call) {
     const { deps, run } = ctx;
     const { args } = call;
-    return call.finish(
+    const result = await call.finish(
       await skillCreateFromTool(
         deps.prisma,
-        {
-          spaceId: run.spaceId,
-          userId: run.userId,
-        },
+        { spaceId: run.spaceId, userId: run.userId },
         {
           name: args.name ? String(args.name) : undefined,
           description: args.description ? String(args.description) : undefined,
@@ -293,17 +323,17 @@ export const taskTools: ToolHandlers = {
         },
       ),
     );
+    const created = successfulSkillChange(result);
+    if (created) await recordSkillEvidence(ctx, "skill.created", created);
+    return result;
   },
   async skill_update(ctx, call) {
     const { deps, run } = ctx;
     const { args } = call;
-    return call.finish(
+    const result = await call.finish(
       await skillUpdateFromTool(
         deps.prisma,
-        {
-          spaceId: run.spaceId,
-          userId: run.userId,
-        },
+        { spaceId: run.spaceId, userId: run.userId },
         {
           name: args.name ? String(args.name) : undefined,
           skillId: args.skillId ? String(args.skillId) : undefined,
@@ -314,22 +344,25 @@ export const taskTools: ToolHandlers = {
         },
       ),
     );
+    const updated = successfulSkillChange(result);
+    if (updated) await recordSkillEvidence(ctx, "skill.updated", updated);
+    return result;
   },
   async skill_delete(ctx, call) {
     const { deps, run } = ctx;
     const { args } = call;
-    return call.finish(
+    const result = await call.finish(
       await skillDeleteFromTool(
         deps.prisma,
-        {
-          spaceId: run.spaceId,
-          userId: run.userId,
-        },
+        { spaceId: run.spaceId, userId: run.userId },
         {
           name: args.name ? String(args.name) : undefined,
           skillId: args.skillId ? String(args.skillId) : undefined,
         },
       ),
     );
+    const removed = successfulSkillChange(result);
+    if (removed) await recordSkillEvidence(ctx, "skill.deleted", removed);
+    return result;
   },
 };
