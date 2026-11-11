@@ -14,6 +14,11 @@ import { listAgentSkillRecords } from "./skill-tools.js";
  */
 const REVIEW_NONCE_PREFIX = "post-task-review:";
 
+/** A deployment can disable background model spending without disabling skills. */
+export function postTaskLearningEnabled(): boolean {
+  return process.env.POST_TASK_LEARNING_ENABLED !== "false";
+}
+
 /** Review work can inspect evidence and maintain local knowledge, never send externally. */
 const REVIEW_TOOL_CAPABILITIES: ReadonlySet<string> = new Set([
   "recall_memory",
@@ -57,6 +62,7 @@ export function postTaskReviewEligible(input: {
   resultText: string;
 }) {
   return (
+    postTaskLearningEnabled() &&
     !isPostTaskReview(input.run) &&
     input.run.trigger !== "reaction" &&
     input.run.trigger !== "created" &&
@@ -254,6 +260,7 @@ export function createPostTaskReviewReconciler(
   }
   let cursor: { at: Date; id: string } | undefined;
   return async (): Promise<number> => {
+    if (!postTaskLearningEnabled()) return 0;
     const events = await deps.prisma.event.findMany({
       where: {
         type: { in: ["run.completed", "run.failed"] },
