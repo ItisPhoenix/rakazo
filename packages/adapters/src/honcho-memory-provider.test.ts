@@ -231,9 +231,9 @@ describe("HonchoMemoryProvider", () => {
     expect(calls(fetch).filter((call) => call.path.endsWith("/chat"))).toHaveLength(0);
   });
 
-  it("falls back to reasoned recall when automatic direct search has no stored facts", async () => {
+  it("falls back to peer reasoning when direct search has no stored facts", async () => {
     const fetch = honchoFetch({ "bot-bot-1": "Relevant response from chat" });
-    const memory = provider(fetch, { mode: "local" });
+    const memory = provider(fetch, { recallStrategy: "conclusions" });
     const result = await memory.recall(
       { query: "answer preference?", scope: "isolated", botId: "bot-1", limit: 3 },
       context,
