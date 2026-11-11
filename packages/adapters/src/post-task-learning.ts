@@ -322,10 +322,9 @@ export function createPostTaskReviewReconciler(
       }
     }
     const last = events.at(-1);
-    cursor =
-      events.length === batchSize && last
-        ? { at: last.createdAt, id: last.id }
-        : undefined;
+    // Retain the high-water mark even after a short page. New completions have
+    // later timestamps and can be picked up without rescanning old reviews.
+    if (last) cursor = { at: last.createdAt, id: last.id };
     return repaired;
   };
 }
