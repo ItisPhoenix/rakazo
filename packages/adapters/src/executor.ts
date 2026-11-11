@@ -198,6 +198,7 @@ import {
 import { loadAgentScratchpadContext } from "./scratchpad-context.js";
 import { inferScript } from "./scripted-runtime.js";
 import { loadSharedSpaceNote } from "./shared-space-note.js";
+import { filterPostTaskReviewTools, isPostTaskReview } from "./post-task-learning.js";
 import { builtinAgentSkillRecords, listAgentSkillRecords } from "./skill-tools.js";
 import {
   filterStrategicInitiativeTools,
@@ -1305,6 +1306,7 @@ export function createRunExecutor(executorDeps: ExecutorDeps) {
           trigger: run.trigger,
           clientNonce: run.clientNonce,
         });
+        const reviewBuiltins = filterPostTaskReviewTools(strategicBuiltins, run);
         const exposedConnectorTools = discovered.filter(
           (tool) => !builtinAgentTools.some((builtin) => builtin.name === tool.name),
         );
@@ -1312,8 +1314,9 @@ export function createRunExecutor(executorDeps: ExecutorDeps) {
           trigger: run.trigger,
           clientNonce: run.clientNonce,
         });
+        const reviewConnectorTools = isPostTaskReview(run) ? [] : strategicConnectorTools;
         const connectorTools = new Map(
-          strategicConnectorTools.map((tool) => [tool.name, tool] as const),
+          reviewConnectorTools.map((tool) => [tool.name, tool] as const),
         );
         const trustLoaders = createRunTrustLoaders(deps, {
           run,
@@ -1334,8 +1337,8 @@ export function createRunExecutor(executorDeps: ExecutorDeps) {
         // so it gets no connector tools either.
         const tools =
           run.trigger === "created"
-            ? strategicBuiltins
-            : [...strategicBuiltins, ...strategicConnectorTools];
+            ? reviewBuiltins
+            : [...reviewBuiltins, ...reviewConnectorTools];
         const taskCatalogInstruction = tools.some((tool) => tool.name === "task_catalog")
           ? TASK_CATALOG_GUIDANCE
           : undefined;
@@ -1492,7 +1495,7 @@ export function createRunExecutor(executorDeps: ExecutorDeps) {
           },
           tools: {
             offered: tools,
-            builtins: strategicBuiltins,
+            builtins: reviewBuiltins,
             connector: connectorTools,
             disabled: disabledBuiltinTools,
             connectedPlugins,
@@ -1812,15 +1815,17 @@ export function createRunExecutor(executorDeps: ExecutorDeps) {
                 replyGuidance: runReplyGuidance(run.trigger, replyMode),
                 // These runs get a narrow tool set, so guidance names only the tools they have.
                 disabledBuiltinTools:
-                  isStrategicInitiativeRun(run) || run.trigger === BACKGROUND_HELPER_TRIGGER
+                  isStrategicInitiativeRun(run) ||
+                  isPostTaskReview(run) ||
+                  run.trigger === BACKGROUND_HELPER_TRIGGER
                     ? new Set(
                         builtinAgentTools
                           .map((tool) => tool.name)
-                          .filter((name) => !strategicBuiltins.some((tool) => tool.name === name)),
+                          .filter((name) => !reviewBuiltins.some((tool) => tool.name === name)),
                       )
                     : disabledBuiltinTools,
-                offeredFleetTools: offeredFleetTools(strategicBuiltins),
-                followUpsOffered: followUpsOffered(strategicBuiltins, ownerStartedRun),
+                offeredFleetTools: offeredFleetTools(reviewBuiltins),
+                followUpsOffered: followUpsOffered(reviewBuiltins, ownerStartedRun),
                 backgroundHelpersAllowed: backgroundHelpersAllowed({
                   threadBotId: thread.botId,
                   botId: bot.id,
