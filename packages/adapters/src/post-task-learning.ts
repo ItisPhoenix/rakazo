@@ -258,8 +258,8 @@ export function createPostTaskReviewReconciler(
     throw new Error("Invalid learning recovery batch size");
   }
   let cursor: { at: Date; id: string } | undefined;
-  return async (): Promise<number> => {
-    if (!postTaskLearningEnabled()) return 0;
+  return async (): Promise<void> => {
+    if (!postTaskLearningEnabled()) return;
     const events = await deps.prisma.event.findMany({
       where: {
         type: { in: ["run.completed", "run.failed"] },
@@ -342,6 +342,8 @@ export function createPostTaskReviewReconciler(
     // Retain the high-water mark even after a short page. New completions have
     // later timestamps and can be picked up without rescanning old reviews.
     if (last) cursor = { at: last.createdAt, id: last.id };
-    return repaired;
+    if (repaired > 0) {
+      getLogger().info("post-task review reconciliation", { repaired });
+    }
   };
 }
