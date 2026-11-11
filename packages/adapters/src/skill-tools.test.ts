@@ -130,6 +130,24 @@ describe("skill tools", () => {
     });
   });
 
+  it("records candidate provenance for automatically learned skills", async () => {
+    const created = await skillCreateFromTool(prisma as never, owner, {
+      name: "Learned practice",
+      description: "Repeat an observed approach",
+      body: "Use the observed procedure.",
+      sourceRunId: "source-run-id",
+    });
+    expect(created).toMatchObject({ ok: true });
+    const metadata = await skillReadFromTool(prisma as never, owner, {
+      name: "Learned practice",
+      file: "metadata/learning.json",
+    });
+    expect(JSON.parse(String(metadata.content))).toEqual({
+      sourceRunId: "source-run-id",
+      status: "candidate",
+    });
+  });
+
   it("preserves a usable previous skill after a successful improvement", async () => {
     await skillCreateFromTool(prisma as never, owner, {
       name: "Reusable process",
