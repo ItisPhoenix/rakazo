@@ -39,7 +39,11 @@ import {
   shouldEnqueueCompaction,
 } from "./history-compaction.js";
 import { connectorStepNames } from "./pi-runtime-tools.js";
-import { isPostTaskReview, queuePostTaskReview } from "./post-task-learning.js";
+import {
+  isPostTaskReview,
+  postTaskReviewEligible,
+  queuePostTaskReview,
+} from "./post-task-learning.js";
 import {
   backOffRoutineAfterAccountError,
   clearRoutineBackoff,
@@ -890,6 +894,12 @@ export async function completeRun(ctx: RunContext) {
     ctx.source.peerMessage?.repliesToRequest === true,
   );
   await ctx.settleRunningHelpers();
+  const shouldReview = postTaskReviewEligible({
+    run,
+    didUsefulWork: reply.toolCalls.length > 0,
+    handedOff: ctx.state.handedOff,
+    resultText: text,
+  });
   const completed = await deps.events.finalizeRun({
     spaceId: run.spaceId,
     threadId: thread.id,
@@ -902,12 +912,13 @@ export async function completeRun(ctx: RunContext) {
     outcome: "completed",
     blocks,
     markUnread: !groupSilentEnd && marksUnread,
+    learningReview: shouldReview,
   });
   if (!completed) return;
   ctx.stopHeartbeatAfterCompletion();
   // Never delay a completed user request to perform learning. The background
   // review is its own durable run and cannot fail or duplicate the original.
-  if (!internalLearningReview) {
+  if (shouldReview) {
     await queuePostTaskReview(
       { prisma: deps.prisma, jobs: deps.jobs },
       {
