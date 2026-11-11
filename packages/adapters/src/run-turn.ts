@@ -1136,6 +1136,7 @@ export async function failRun(
   if (
     runSendsFinishNotification(run.trigger) &&
     !isStrategicInitiativeRun(run) &&
+    !isPostTaskReview(run) &&
     !failed.continuationRunId &&
     !retrying
   ) {
