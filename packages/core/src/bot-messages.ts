@@ -70,8 +70,7 @@ export function resolveBotAddress<T extends BotAddress>(
   const name = input.name?.trim();
   if (botId) {
     const target = bots.find((bot) => bot.id === botId);
-    if (!target || (name && target.name.toLowerCase() !== name.toLowerCase()))
-      return undefined;
+    if (!target || (name && target.name.toLowerCase() !== name.toLowerCase())) return undefined;
     return target;
   }
   if (!name) return undefined;
