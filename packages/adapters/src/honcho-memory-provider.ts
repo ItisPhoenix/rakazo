@@ -320,12 +320,9 @@ export class HonchoMemoryProvider implements SemanticMemoryProvider {
         })),
       );
 
-      // A transient empty search is not proof that nothing is relevant. In auto
-      // mode, try reasoning before returning silence when no conclusions matched.
-      if (
-        searched.some(({ result }) => result.ok && result.value.length > 0) ||
-        (recallStrategy === "conclusions" && searched.some(({ result }) => result.ok))
-      ) {
+      // Even an explicit fast search can return no stored facts: try reasoned recall
+      // rather than treating an empty index as proof nothing is relevant.
+      if (searched.some(({ result }) => result.ok && result.value.length > 0)) {
         const groups = searched.map(({ entity, result }) => {
           const items: SemanticMemoryResult[] = [];
           if (!result.ok) return items;
