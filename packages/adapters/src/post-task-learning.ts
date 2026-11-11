@@ -125,6 +125,7 @@ async function recentSkillEvidence(prisma: PrismaClient, spaceId: string, userId
   const skills = await listAgentSkillRecords(prisma, { spaceId, userId });
   const namesById = new Map(skills.map((skill) => [skill.id, skill.name] as const));
   const stats = new Map<string, { used: number; completed: number; failed: number }>();
+  const seenUses = new Set<string>();
   for (const event of events) {
     if (!event.runId) continue;
     const run = byId.get(event.runId);
@@ -134,6 +135,9 @@ async function recentSkillEvidence(prisma: PrismaClient, spaceId: string, userId
     const skillId = "skillId" in data && typeof data.skillId === "string" ? data.skillId : "";
     const name = namesById.get(skillId);
     if (!name) continue;
+    const useKey = `${event.runId}:${skillId}`;
+    if (seenUses.has(useKey)) continue;
+    seenUses.add(useKey);
     const row = stats.get(name) ?? { used: 0, completed: 0, failed: 0 };
     row.used += 1;
     if (run.status === "completed") row.completed += 1;
