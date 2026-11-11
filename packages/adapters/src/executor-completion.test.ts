@@ -1,6 +1,8 @@
 import { ModelOutputError } from "@rakazo/adapter-kit";
 import { MISSING_TOOL_FINAL_RESPONSE_ERROR } from "@rakazo/core";
+import type { Run } from "@rakazo/db";
 import { describe, expect, it } from "vitest";
+import type { ExecutorDeps } from "./executor-deps.js";
 import { runIdentityInstruction } from "./run-instructions.js";
 import { mayOpenModelStream } from "./run-lifecycle.js";
 import {
@@ -25,10 +27,8 @@ import {
   runReplyMode,
   TICKET_SILENT_REPLY_GUIDANCE,
 } from "./run-replies.js";
-import { handoffEndedTurn } from "./run-turn.js";
 import { createReplyState } from "./run-progress.js";
-import type { ExecutorDeps } from "./executor-deps.js";
-import type { Run } from "@rakazo/db";
+import { handoffEndedTurn } from "./run-turn.js";
 import {
   couldBecomeNoResponse,
   isExactNoResponse,
@@ -48,9 +48,7 @@ describe("restart-safe delegated progress state", () => {
           findMany: async () => [
             {
               clientNonce: null,
-              blocks: [
-                { kind: "bot_message_sent", toBotId: "bot-2", intent: "request" },
-              ],
+              blocks: [{ kind: "bot_message_sent", toBotId: "bot-2", intent: "request" }],
             },
           ],
         },
