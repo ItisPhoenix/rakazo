@@ -402,6 +402,15 @@ export async function gateToolCall(
         newDestination: siteGate === "new",
         purchase: paying,
       });
+  // Silent learning never interrupts an owner for an approval. A skill requiring
+  // extra authority remains unchanged until an ordinary owner-authorized run.
+  if (isPostTaskReview(run) && plan !== "allow") {
+    return {
+      result: {
+        error: "This learning action requires permission and was not performed.",
+      },
+    };
+  }
   // Nobody is there to approve a purchase a webhook run reaches.
   if (paying && run.trigger === "webhook" && plan !== "deny") {
     await auditToolCall(ctx, name, "denied", { reason: "purchase_unattended" });
