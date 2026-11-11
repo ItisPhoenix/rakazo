@@ -173,6 +173,8 @@ export async function queuePostTaskReview(
   let reviewRunId: string;
   try {
     const created = await deps.prisma.$transaction(async (tx) => {
+      // Match the thread-before-run lock order used by message creation.
+      await tx.$queryRaw`SELECT id FROM threads WHERE id = ${run.threadId} FOR UPDATE`;
       const source = await tx.run.findFirst({
         where: { id: run.id, spaceId: run.spaceId, status: "completed" },
         select: { id: true },
