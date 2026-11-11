@@ -1,8 +1,11 @@
+import type { ProductEventType } from "@rakazo/contracts";
+import { getLogger } from "@rakazo/logging";
 import {
   desktopGuardApplies,
   desktopProtectionGuardMessage,
   protectedComputerLifecycleRefusal,
 } from "./desktop-command-guard.js";
+import { postTaskReviewSourceRunId } from "./post-task-learning.js";
 import type { RunContext } from "./run-context.js";
 import type { ToolHandlers } from "./run-tool-gate.js";
 import {
@@ -25,6 +28,7 @@ import {
   updateScratchpadItemFromTool,
 } from "./scratchpad-tools.js";
 import {
+  listAgentSkillRecords,
   skillCreateFromTool,
   skillDeleteFromTool,
   skillReadFromTool,
@@ -67,6 +71,31 @@ export async function scheduleCreateRefusal(
       ...scheduleCreateFields(args),
     }));
   return error ? { error } : undefined;
+}
+
+/** Store only skill identity and action evidence, never skill body or credentials. */
+async function recordSkillEvidence(
+  ctx: RunContext,
+  type: ProductEventType,
+  payload: { skillId?: string },
+): Promise<void> {
+  await ctx.deps.events
+    .append({
+      spaceId: ctx.run.spaceId,
+      threadId: ctx.thread.id,
+      botId: ctx.bot.id,
+      runId: ctx.runId,
+      type,
+      payload,
+    })
+    .catch((error) => getLogger().error("skill evidence append", error));
+}
+
+function successfulSkillChange(result: unknown): { skillId?: string } | null {
+  if (!result || typeof result !== "object") return null;
+  const data = result as { ok?: unknown; id?: unknown; name?: unknown };
+  if (data.ok !== true || typeof data.name !== "string") return null;
+  return typeof data.id === "string" ? { skillId: data.id } : {};
 }
 
 /** The task catalog, scratchpad, ticket board, schedules and skills. */
@@ -262,48 +291,57 @@ export const taskTools: ToolHandlers = {
   async skill_read(ctx, call) {
     const { deps, run } = ctx;
     const { args } = call;
-    return skillReadFromTool(
+    const result = await skillReadFromTool(
       deps.prisma,
-      {
-        spaceId: run.spaceId,
-        userId: run.userId,
-      },
+      { spaceId: run.spaceId, userId: run.userId },
       {
         name: args.name ? String(args.name) : undefined,
         skillId: args.skillId ? String(args.skillId) : undefined,
         file: args.file ? String(args.file) : undefined,
       },
     );
+    const skillName = result.name;
+    if (typeof skillName === "string" && !("error" in result)) {
+      const records = await listAgentSkillRecords(deps.prisma, {
+        spaceId: run.spaceId,
+        userId: run.userId,
+      });
+      const skill = records.find(
+        (entry) => entry.name.toLowerCase() === skillName.toLowerCase(),
+      );
+      if (skill) {
+        await recordSkillEvidence(ctx, "skill.consulted", { skillId: skill.id });
+      }
+    }
+    return result;
   },
   async skill_create(ctx, call) {
     const { deps, run } = ctx;
     const { args } = call;
-    return call.finish(
+    const result = await call.finish(
       await skillCreateFromTool(
         deps.prisma,
-        {
-          spaceId: run.spaceId,
-          userId: run.userId,
-        },
+        { spaceId: run.spaceId, userId: run.userId },
         {
           name: args.name ? String(args.name) : undefined,
           description: args.description ? String(args.description) : undefined,
           body: args.body ? String(args.body) : undefined,
           content: args.content ? String(args.content) : undefined,
+          sourceRunId: postTaskReviewSourceRunId(run),
         },
       ),
     );
+    const created = successfulSkillChange(result);
+    if (created) await recordSkillEvidence(ctx, "skill.created", created);
+    return result;
   },
   async skill_update(ctx, call) {
     const { deps, run } = ctx;
     const { args } = call;
-    return call.finish(
+    const result = await call.finish(
       await skillUpdateFromTool(
         deps.prisma,
-        {
-          spaceId: run.spaceId,
-          userId: run.userId,
-        },
+        { spaceId: run.spaceId, userId: run.userId },
         {
           name: args.name ? String(args.name) : undefined,
           skillId: args.skillId ? String(args.skillId) : undefined,
@@ -314,22 +352,25 @@ export const taskTools: ToolHandlers = {
         },
       ),
     );
+    const updated = successfulSkillChange(result);
+    if (updated) await recordSkillEvidence(ctx, "skill.updated", updated);
+    return result;
   },
   async skill_delete(ctx, call) {
     const { deps, run } = ctx;
     const { args } = call;
-    return call.finish(
+    const result = await call.finish(
       await skillDeleteFromTool(
         deps.prisma,
-        {
-          spaceId: run.spaceId,
-          userId: run.userId,
-        },
+        { spaceId: run.spaceId, userId: run.userId },
         {
           name: args.name ? String(args.name) : undefined,
           skillId: args.skillId ? String(args.skillId) : undefined,
         },
       ),
     );
+    const removed = successfulSkillChange(result);
+    if (removed) await recordSkillEvidence(ctx, "skill.deleted", removed);
+    return result;
   },
 };

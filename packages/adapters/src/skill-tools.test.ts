@@ -27,7 +27,7 @@ function makePrisma(rows: Array<Record<string, unknown>> = []) {
       ),
       findFirst: vi.fn(async ({ where }: { where: Scope & { id: string } }) => {
         const row = store.find((item) => item.id === where.id && inScope(item, where));
-        return row ? { files: row.files ?? null } : null;
+        return row ? { ...row, files: row.files ?? null } : null;
       }),
       create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
         const row = {
@@ -128,6 +128,45 @@ describe("skill tools", () => {
     expect(await skillReadFromTool(prisma as never, owner, { name: "Daily standup" })).toEqual({
       error: "Skill not found.",
     });
+  });
+
+  it("records candidate provenance for automatically learned skills", async () => {
+    const created = await skillCreateFromTool(prisma as never, owner, {
+      name: "Learned practice",
+      description: "Repeat an observed approach",
+      body: "Use the observed procedure.",
+      sourceRunId: "source-run-id",
+    });
+    expect(created).toMatchObject({ ok: true });
+    const metadata = await skillReadFromTool(prisma as never, owner, {
+      name: "Learned practice",
+      file: "metadata/learning.json",
+    });
+    expect(JSON.parse(String(metadata.content))).toEqual({
+      sourceRunId: "source-run-id",
+      status: "candidate",
+    });
+  });
+
+  it("preserves a usable previous skill after a successful improvement", async () => {
+    await skillCreateFromTool(prisma as never, owner, {
+      name: "Reusable process",
+      description: "A repeatable task",
+      body: "First proven version",
+    });
+    const updated = await skillUpdateFromTool(prisma as never, owner, {
+      name: "Reusable process",
+      body: "Improved version",
+    });
+    expect(updated).toMatchObject({ ok: true });
+    const current = await skillReadFromTool(prisma as never, owner, { name: "Reusable process" });
+    expect(current.files).toEqual(["history/1.md"]);
+    const prior = await skillReadFromTool(prisma as never, owner, {
+      name: "Reusable process",
+      file: "history/1.md",
+    });
+    expect(String(prior.content)).toContain("First proven version");
+    expect(String(current.content)).toContain("Improved version");
   });
 
   it("lists a skill's reference files and reads one by exact path only", async () => {

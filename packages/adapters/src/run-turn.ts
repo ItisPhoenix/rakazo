@@ -40,6 +40,11 @@ import {
 } from "./history-compaction.js";
 import { connectorStepNames } from "./pi-runtime-tools.js";
 import {
+  isPostTaskReview,
+  postTaskReviewEligible,
+  queuePostTaskReview,
+} from "./post-task-learning.js";
+import {
   backOffRoutineAfterAccountError,
   clearRoutineBackoff,
   modelAccountRefusal,
@@ -854,13 +859,14 @@ export async function completeRun(ctx: RunContext) {
       skipEmptyFallback: reply.publishedTerminalSubagent || reply.publishedMidTurnUserMessage,
     });
   }
-  const blocks = ctx.state.handedOff
+  const internalLearningReview = isPostTaskReview(run);
+  const blocks = ctx.state.handedOff || internalLearningReview
     ? []
     : finalBlocksAfterMidTurnProgress(
         redactBlocks(completionBlocks, ctx.secrets),
         reply.publishedMidTurnUserMessage || runAllowsSilentEmpty(run.trigger),
       );
-  const text = ctx.state.handedOff
+  const text = ctx.state.handedOff || internalLearningReview
     ? ""
     : redactSecrets(completionNotificationBody(silentReply.assembled, blocks), ctx.secrets);
   if (containsSecret(text, ctx.secrets)) {
@@ -871,6 +877,7 @@ export async function completeRun(ctx: RunContext) {
   // failure, not a successful delegated summary.
   if (
     !ctx.state.handedOff &&
+    !internalLearningReview &&
     !silentReply.assembled.trim() &&
     emptyDelegatedToolTurnShouldFail(completionBlocks)
   ) {
@@ -887,6 +894,12 @@ export async function completeRun(ctx: RunContext) {
     ctx.source.peerMessage?.repliesToRequest === true,
   );
   await ctx.settleRunningHelpers();
+  const shouldReview = postTaskReviewEligible({
+    run,
+    didUsefulWork: reply.toolCalls.length > 0,
+    handedOff: ctx.state.handedOff,
+    resultText: text,
+  });
   const completed = await deps.events.finalizeRun({
     spaceId: run.spaceId,
     threadId: thread.id,
@@ -899,9 +912,23 @@ export async function completeRun(ctx: RunContext) {
     outcome: "completed",
     blocks,
     markUnread: !groupSilentEnd && marksUnread,
+    learningReview: shouldReview,
   });
   if (!completed) return;
   ctx.stopHeartbeatAfterCompletion();
+  // Never delay a completed user request to perform learning. The background
+  // review is its own durable run and cannot fail or duplicate the original.
+  if (shouldReview) {
+    await queuePostTaskReview(
+      { prisma: deps.prisma, jobs: deps.jobs },
+      {
+        run,
+        didUsefulWork: reply.toolCalls.length > 0,
+        handedOff: ctx.state.handedOff,
+        resultText: text,
+      },
+    ).catch((error) => getLogger().error("post-task review scheduling", error));
+  }
   if (run.trigger === "routine" && run.routineId) {
     await clearRoutineBackoff(deps, { routineId: run.routineId, userId: run.userId });
   }
@@ -1029,6 +1056,12 @@ export async function failRun(
       ? [{ kind: "text" as const, text: partialText }]
       : [];
   await ctx.settleRunningHelpers();
+  const shouldReview = postTaskReviewEligible({
+    run,
+    didUsefulWork: reply.toolCalls.length > 0,
+    handedOff: ctx.state.handedOff,
+    resultText: message,
+  });
   const failed = await deps.events.finalizeRun({
     spaceId: run.spaceId,
     threadId: thread.id,
@@ -1040,9 +1073,16 @@ export async function failRun(
     leaseFence: ctx.fence,
     outcome: "failed",
     error: message,
+    learningReview: shouldReview,
     ...(partialReply.length > 0 ? { partialReply } : {}),
   });
   if (!failed) return;
+  if (shouldReview) {
+    await queuePostTaskReview(
+      { prisma: deps.prisma, jobs: deps.jobs },
+      { run, didUsefulWork: true, handedOff: false, resultText: message },
+    ).catch((reviewError) => getLogger().error("failed-task review scheduling", reviewError));
+  }
   if (
     error instanceof TransientModelError ||
     error instanceof ModelAccountError ||
@@ -1109,6 +1149,7 @@ export async function failRun(
   if (
     runSendsFinishNotification(run.trigger) &&
     !isStrategicInitiativeRun(run) &&
+    !isPostTaskReview(run) &&
     !failed.continuationRunId &&
     !retrying
   ) {

@@ -1498,6 +1498,7 @@ describe("userTurnInstructions", () => {
       archiveBot,
       "Connected plugins: none",
       "Agent skills",
+      expect.stringContaining("When a task needs a capability"),
       expect.stringContaining("read the Rakazo skill"),
       "Taught skills",
       ...stableTail,
@@ -1531,6 +1532,7 @@ describe("userTurnInstructions", () => {
       "This entire computer workspace is your private home.",
       ...stableMiddle,
       archiveBot,
+      expect.stringContaining("When a task needs a capability"),
       ...stableTail,
     ]);
     // The timestamp rides on the per-turn prompt so the system prefix stays cacheable.
@@ -1581,6 +1583,7 @@ describe("userTurnInstructions", () => {
       "This entire computer workspace is your private home.",
       ...stableMiddle,
       archiveBot,
+      expect.stringContaining("When a task needs a capability"),
       ...stableTail,
     ]);
   });

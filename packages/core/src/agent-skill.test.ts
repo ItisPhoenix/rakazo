@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  archiveSkillContent,
   buildSkillMd,
   expandSkillReferencesInPrompt,
   extractForcedSkillName,
@@ -10,6 +11,22 @@ import {
   parseSkillMd,
   renameRoutineSkillMentions,
 } from "./agent-skill.js";
+
+describe("skill revision preservation", () => {
+  it("retains prior versions and unrelated reference files", () => {
+    const first = archiveSkillContent({ "references/guide.md": "Reference" }, "Previous version");
+    expect(first).toEqual({
+      "references/guide.md": "Reference",
+      "history/1.md": "Previous version",
+    });
+    const second = archiveSkillContent(first, "Revised version");
+    expect(second).toMatchObject({
+      "history/1.md": "Previous version",
+      "history/2.md": "Revised version",
+      "references/guide.md": "Reference",
+    });
+  });
+});
 
 describe("built-in skill merging", () => {
   it("uses the same normalized names for catalog precedence and prompt expansion", () => {

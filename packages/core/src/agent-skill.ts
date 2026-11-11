@@ -1,5 +1,5 @@
 /**
- * Claude Agent Skills: reusable SKILL.md recipes shared across assistants.
+ * Portable agent skills: reusable SKILL.md recipes shared across assistants.
  * The Pi runtime already understands this format; we persist and inject them.
  * Distinct from taught skills (demo/record playbooks on a single bot).
  */
@@ -14,7 +14,7 @@ export type ParsedSkillMd = {
   body: string;
   /**
    * All frontmatter keys as parsed scalars/structures. Unknown keys are preserved
-   * so Claude Agent Skills with extra fields round-trip safely.
+   * so Portable agent skills with extra fields round-trip safely.
    */
   frontmatter: Record<string, unknown>;
 };
@@ -118,6 +118,25 @@ export function buildSkillMd(input: {
   return `---\n${lines.join("\n")}\n---\n${body.startsWith("\n") ? body : `\n${body}`}`;
 }
 
+/** Preserve the previous usable procedure on every change, so it can be restored. */
+export function archiveSkillContent(
+  files: unknown,
+  previousContent: string,
+): Record<string, string> {
+  const stored: Record<string, string> =
+    files && typeof files === "object" && !Array.isArray(files)
+      ? Object.fromEntries(
+          Object.entries(files).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
+        )
+      : {};
+  const revisions = Object.keys(stored)
+    .map((name) => /^history\/([0-9]+)\.md$/.exec(name))
+    .filter((match): match is RegExpExecArray => match !== null)
+    .map((match) => Number(match[1]));
+  const next = Math.max(0, ...revisions) + 1;
+  return { ...stored, [`history/${next}.md`]: previousContent };
+}
+
 export function skillCatalogLine(entry: Pick<SkillCatalogEntry, "name" | "description">): string {
   return `- ${entry.name}: ${entry.description}`;
 }
@@ -126,7 +145,7 @@ export function formatSkillsCatalogInstruction(entries: SkillCatalogEntry[]): st
   if (entries.length === 0) return undefined;
   const lines = entries.slice(0, 50).map(skillCatalogLine).join("\n");
   return [
-    "Available Claude Agent Skills (SKILL.md recipes shared across assistants; generic how-tos, not account-specific routines). The Pi runtime already understands this format; we persist and inject them:",
+    "Available Portable agent skills (SKILL.md recipes shared across assistants; generic how-tos, not account-specific routines). The Pi runtime already understands this format; we persist and inject them:",
     lines,
     "When a skill matches the user's request, call skill_read for that name and follow it immediately. Prefer matching skills over improvising multi-step recipes.",
     "Users can force a skill with /Name in the composer. Routines may mention a skill as @Name — that loads the skill at fire time.",

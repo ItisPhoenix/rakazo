@@ -25,6 +25,7 @@ import type { RemoteConnectorDependencies } from "./installed-connectors.js";
 import { InstalledConnectorProvider } from "./installed-connectors.js";
 import { IntegrationProviderSettings } from "./integration-provider-settings.js";
 import { createJobReconciler } from "./job-reconciler.js";
+import { createPostTaskReviewReconciler } from "./post-task-learning.js";
 import { McpConnector, mcpStdioOptionsFromEnv } from "./mcp-connector.js";
 import { McpOAuthBroker } from "./mcp-oauth.js";
 import { reconcileMediaVideos } from "./media-video-poll.js";
@@ -267,6 +268,7 @@ export function createRunReconciler(
       jobs,
       billingEnabled: deps.billingEnabled,
     }),
+    reconcilePostTaskReviews: createPostTaskReviewReconciler({ prisma, jobs }),
     reconcileCloudAgents: () => reconcileCloudAgents({ prisma, jobs, cloudAgent }),
     reconcilePurchases: () => reconcilePurchases({ prisma, jobs, paymentWallet }),
     reconcileMediaVideos: () => reconcileMediaVideos({ prisma, jobs, mediaGeneration }),

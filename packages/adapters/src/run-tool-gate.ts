@@ -52,6 +52,7 @@ import type { ExecutorDeps } from "./executor-deps.js";
 import { CATALOG_LOAD, CATALOG_SEARCH } from "./lazy-tool-catalog.js";
 import { findConnectedModelCredential } from "./model-selection.js";
 import { paidRequestEffect } from "./paid-request.js";
+import { isPostTaskReview, postTaskReviewToolAllowed } from "./post-task-learning.js";
 import type { PurchaseApproval } from "./purchase-gate.js";
 import { PURCHASE_CHECKED_TOOLS, purchaseApprovalOf } from "./purchase-gate.js";
 import { autoReviewCheckerProvider } from "./run-auto-review.js";
@@ -202,6 +203,13 @@ export async function gateToolCall(
         error:
           "This unattended run cannot use an unclassified or mutating tool. Ask the owner to start that action explicitly.",
       },
+    };
+  }
+  // An internal review may only maintain local knowledge and reusable skills.
+  // Recheck at dispatch so a hidden catalog route cannot expose extra actions.
+  if (isPostTaskReview(run) && (!postTaskReviewToolAllowed(name) || viaConnector)) {
+    return {
+      result: { error: "This internal learning run cannot perform external or unrelated actions." },
     };
   }
   const requiresUnattendedApproval =
@@ -394,6 +402,15 @@ export async function gateToolCall(
         newDestination: siteGate === "new",
         purchase: paying,
       });
+  // Silent learning never interrupts an owner for an approval. A skill requiring
+  // extra authority remains unchanged until an ordinary owner-authorized run.
+  if (isPostTaskReview(run) && plan !== "allow") {
+    return {
+      result: {
+        error: "This learning action requires permission and was not performed.",
+      },
+    };
+  }
   // Nobody is there to approve a purchase a webhook run reaches.
   if (paying && run.trigger === "webhook" && plan !== "deny") {
     await auditToolCall(ctx, name, "denied", { reason: "purchase_unattended" });
