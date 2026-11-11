@@ -4,6 +4,8 @@ import { escapePromptData, truncatePlainText } from "@rakazo/core";
 import type { PrismaClient } from "@rakazo/db";
 import { isUniqueViolation } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
+import type { MessageBlock } from "@rakazo/contracts";
+import { messageBlocksText } from "./run-replies.js";
 
 /**
  * An internal post-task review is an ordinary durable run, not a second
@@ -218,4 +220,98 @@ export async function queuePostTaskReview(
     getLogger().error("post-task review enqueue", error);
   });
   return true;
+}
+
+
+/**
+ * Repair a crash between the original run's atomic completion marker and the
+ * internal review's creation. Work is bounded and paged; unique run nonces
+ * prevent multiple reviews even if this pass races another worker.
+ */
+export function createPostTaskReviewReconciler(
+  deps: { prisma: PrismaClient; jobs: JobPublisher },
+  options: { batchSize?: number } = {},
+) {
+  const batchSize = options.batchSize ?? 50;
+  if (!Number.isSafeInteger(batchSize) || batchSize < 1) {
+    throw new Error("Invalid learning recovery batch size");
+  }
+  let cursor: { at: Date; id: string } | undefined;
+  return async (): Promise<number> => {
+    const events = await deps.prisma.event.findMany({
+      where: {
+        type: "run.completed",
+        runId: { not: null },
+        payload: { path: ["learningReview"], equals: true },
+        ...(cursor
+          ? {
+              OR: [
+                { createdAt: { gt: cursor.at } },
+                { createdAt: cursor.at, id: { gt: cursor.id } },
+              ],
+            }
+          : {}),
+      },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      take: batchSize,
+      select: { id: true, createdAt: true, runId: true, spaceId: true },
+    });
+    let repaired = 0;
+    for (const event of events) {
+      if (!event.runId) continue;
+      const source = await deps.prisma.run.findFirst({
+        where: { id: event.runId, spaceId: event.spaceId, status: "completed" },
+        select: {
+          id: true,
+          spaceId: true,
+          botId: true,
+          threadId: true,
+          userId: true,
+          trigger: true,
+          clientNonce: true,
+        },
+      });
+      if (!source || isPostTaskReview(source)) continue;
+      const exists = await deps.prisma.run.findUnique({
+        where: {
+          spaceId_clientNonce: {
+            spaceId: source.spaceId,
+            clientNonce: `${REVIEW_NONCE_PREFIX}${source.id}`,
+          },
+        },
+        select: { id: true },
+      });
+      if (exists) continue;
+      const messages = await deps.prisma.message.findMany({
+        where: { runId: source.id, role: "bot" },
+        orderBy: { seq: "desc" },
+        take: 3,
+        select: { blocks: true },
+      });
+      const resultText = messages
+        .map((message) =>
+          messageBlocksText(
+            Array.isArray(message.blocks) ? (message.blocks as MessageBlock[]) : [],
+          ).trim(),
+        )
+        .find((text) => text.length > 0);
+      if (!resultText) continue;
+      if (
+        await queuePostTaskReview(deps, {
+          run: source,
+          didUsefulWork: true,
+          handedOff: false,
+          resultText,
+        })
+      ) {
+        repaired += 1;
+      }
+    }
+    const last = events.at(-1);
+    cursor =
+      events.length === batchSize && last
+        ? { at: last.createdAt, id: last.id }
+        : undefined;
+    return repaired;
+  };
 }
