@@ -745,9 +745,7 @@ export function consolidatedDelegationReady(
     message.blocks.some(
       (block) =>
         block.kind === "bot_message_received" &&
-        (block.intent === "result" ||
-          (block.intent === "status" &&
-            block.text.startsWith("Could not complete the delegated request:"))) &&
+        block.intent === "result" &&
         requests.some(
           (request) => request.id === message.replyToMessageId && request.botId === block.fromBotId,
         ),
