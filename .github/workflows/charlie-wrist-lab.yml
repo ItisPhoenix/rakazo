@@ -51,8 +51,8 @@ jobs:
       - name: Install reproducible dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Verify Android TypeScript and Expo dependencies
-        run: pnpm --filter @rakazo/mobile check
+      - name: Type-check Android app without changing the fork's pinned Expo versions
+        run: pnpm --filter @rakazo/mobile exec tsc --noEmit -p tsconfig.json
 
       - name: Generate isolated Android project
         run: |
