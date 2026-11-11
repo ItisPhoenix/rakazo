@@ -158,14 +158,18 @@ export function finalBlocksAfterMidTurnProgress(
   return blocks;
 }
 
-/** Outcome to return for a bot_message run after mid-turn progress posts. */
+/** A completed peer run must return a terminal result, even without a final summary. */
 export function botMessageOutcomeFromMidTurn(
   finalText: string,
   midTurnTexts: readonly string[],
-): { text: string; intent: "result" | "status" } | null {
+): { text: string; intent: "result" } {
   const trimmed = finalText.trim();
   if (trimmed) return { text: trimmed, intent: "result" };
   const midTurn = midTurnTexts.map((part) => part.trim()).filter(Boolean);
-  if (midTurn.length === 0) return null;
-  return { text: midTurn.join("\n\n"), intent: "status" };
+  return {
+    text: midTurn.length
+      ? `The delegated bot finished without a final summary. Its last progress was:\n${midTurn.join("\n\n")}`
+      : "The delegated bot completed its turn without a written summary.",
+    intent: "result",
+  };
 }
