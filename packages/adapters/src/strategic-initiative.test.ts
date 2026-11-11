@@ -370,6 +370,23 @@ describe("strategic initiative tool guard", () => {
     expect(strategicInitiativeToolAllowed("request_purchase", run)).toBe(false);
   });
 
+  it("exposes lazy catalog controls but gates the action they resolve to", () => {
+    const run = { trigger: "routine", clientNonce: "strategic-initiative:bot-1:33" };
+    const tools = [
+      { name: "apps_search_tools", readOnly: true, route: { toolName: "__catalog_search" } },
+      { name: "apps_load_tool", readOnly: true, route: { toolName: "__catalog_load" } },
+      { name: "apps_execute_tool", route: { toolName: "__catalog_execute" } },
+      { name: "untrusted_load", route: { toolName: "__catalog_load", resourceId: "external" } },
+    ];
+    expect(filterStrategicInitiativeTools(tools, run).map((tool) => tool.name)).toEqual([
+      "apps_search_tools",
+      "apps_load_tool",
+      "apps_execute_tool",
+    ]);
+    expect(strategicInitiativeToolAllowed("github_list_issues", run, true)).toBe(true);
+    expect(strategicInitiativeToolAllowed("github_delete_repo", run, true)).toBe(false);
+  });
+
   it("does not filter regular runs", () => {
     const tools = [{ name: "ask_user" }, { name: "computer_shell" }];
     expect(
