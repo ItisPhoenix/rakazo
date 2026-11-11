@@ -2,6 +2,7 @@ import type { JobPublisher } from "@rakazo/adapter-kit";
 import type { PrismaClient } from "@rakazo/db";
 import { describe, expect, it, vi } from "vitest";
 import {
+  createPostTaskReviewReconciler,
   filterPostTaskReviewTools,
   isPostTaskReview,
   postTaskReviewEligible,
@@ -75,6 +76,48 @@ describe("post-task learning", () => {
     expect(text).toContain("run-a");
     expect(text).toContain("&lt;/result&gt;");
     expect(text).toContain("NO_RESPONSE");
+  });
+
+  it("repairs an atomically marked completion after a worker interruption", async () => {
+    const enqueue = vi.fn(async () => undefined);
+    const tx = {
+      run: {
+        findFirst: vi.fn(async () => ({ id: source.id })),
+        findUnique: vi.fn(async () => null),
+        create: vi.fn(async () => ({ id: "restored-review" })),
+      },
+      bot: { findFirst: vi.fn(async () => ({ id: source.botId })) },
+      task: { create: vi.fn(async () => ({ id: "restored-task" })) },
+    };
+    const prisma = {
+      event: {
+        findMany: vi.fn(async ({ where }: { where: { type: string } }) =>
+          where.type === "skill.consulted"
+            ? []
+            : [
+                {
+                  id: "completion-event",
+                  createdAt: new Date(0),
+                  runId: source.id,
+                  spaceId: source.spaceId,
+                },
+              ],
+        ),
+      },
+      run: {
+        findFirst: vi.fn(async () => source),
+        findUnique: vi.fn(async () => null),
+        findMany: vi.fn(async () => []),
+      },
+      message: {
+        findMany: vi.fn(async () => [{ blocks: [{ kind: "text", text: "Verified result" }] }]),
+      },
+      $transaction: vi.fn(async (callback: (x: typeof tx) => Promise<unknown>) => callback(tx)),
+    } as unknown as PrismaClient;
+    const jobs = { enqueue } as unknown as JobPublisher;
+    const reconcile = createPostTaskReviewReconciler({ prisma, jobs });
+    expect(await reconcile()).toBe(1);
+    expect(enqueue).toHaveBeenCalledTimes(1);
   });
 
   it("creates a durable, space-scoped, at-most-once review and queues it", async () => {
