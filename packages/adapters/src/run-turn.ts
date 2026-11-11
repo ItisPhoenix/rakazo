@@ -873,6 +873,7 @@ export async function completeRun(ctx: RunContext) {
   // failure, not a successful delegated summary.
   if (
     !ctx.state.handedOff &&
+    !internalLearningReview &&
     !silentReply.assembled.trim() &&
     emptyDelegatedToolTurnShouldFail(completionBlocks)
   ) {
