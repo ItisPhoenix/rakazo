@@ -338,6 +338,9 @@ describe("strategic initiative tool guard", () => {
       { name: "browser_snapshot" },
       { name: "web_search" },
       { name: "run_subagent" },
+      { name: "github_search_issues", readOnly: true },
+      { name: "github_delete_repo", readOnly: true },
+      { name: "github_list_issues" },
       { name: "gmail_send" },
       { name: "request_purchase" },
     ];
@@ -353,7 +356,35 @@ describe("strategic initiative tool guard", () => {
       "browser_snapshot",
       "web_search",
       "run_subagent",
+      "github_search_issues",
     ]);
+  });
+
+  it("enforces declared read-only connector capability and denies unknown actions", () => {
+    const run = { trigger: "routine", clientNonce: "strategic-initiative:bot-2:6" };
+    expect(strategicInitiativeToolAllowed("github_list_issues", run, true)).toBe(true);
+    expect(strategicInitiativeToolAllowed("github_list_issues", run)).toBe(false);
+    expect(strategicInitiativeToolAllowed("github_delete_repo", run, true)).toBe(false);
+    expect(strategicInitiativeToolAllowed("github_delete_repo", run, false)).toBe(false);
+    expect(strategicInitiativeToolAllowed("not_classified", run, true)).toBe(false);
+    expect(strategicInitiativeToolAllowed("request_purchase", run)).toBe(false);
+  });
+
+  it("exposes lazy catalog controls but gates the action they resolve to", () => {
+    const run = { trigger: "routine", clientNonce: "strategic-initiative:bot-1:33" };
+    const tools = [
+      { name: "apps_search_tools", readOnly: true, route: { toolName: "__catalog_search" } },
+      { name: "apps_load_tool", readOnly: true, route: { toolName: "__catalog_load" } },
+      { name: "apps_execute_tool", route: { toolName: "__catalog_execute" } },
+      { name: "untrusted_load", route: { toolName: "__catalog_load", resourceId: "external" } },
+    ];
+    expect(filterStrategicInitiativeTools(tools, run).map((tool) => tool.name)).toEqual([
+      "apps_search_tools",
+      "apps_load_tool",
+      "apps_execute_tool",
+    ]);
+    expect(strategicInitiativeToolAllowed("github_list_issues", run, true)).toBe(true);
+    expect(strategicInitiativeToolAllowed("github_delete_repo", run, true)).toBe(false);
   });
 
   it("does not filter regular runs", () => {
@@ -448,7 +479,7 @@ it.each([
   "shell",
   "browser_act",
   "computer_act",
-  "load_skill",
+  "skill_read",
   "web_search",
   "run_subagent",
   "scratchpad_complete",
@@ -469,6 +500,7 @@ it.each([
   "send_email",
   "request_purchase",
   "catalog_execute",
+  "load_skill",
 ])("keeps %s outside the autonomous tool boundary", (name) => {
   expect(
     strategicInitiativeToolAllowed(name, {

@@ -289,21 +289,17 @@ export function createJobReconciler(
               ? (run.error ?? "")
               : run.status === "failed"
                 ? `Could not complete the delegated request: ${run.error ?? "unknown error"}`
-                : transcript.text ||
-                  "The delegated bot completed its turn without a written summary.";
+                : transcript.progressOnly
+                  ? "The delegated bot finished, but only progress updates were recorded. No final summary is available."
+                  : transcript.text ||
+                    "The delegated bot completed its turn without a written summary.";
             // Loop-guard stops complete without an error; their persisted final text
             // is the only marker available when the executor's outcome delivery fails.
             const loopGuardStop = isLoopGuardStopText(transcript.text);
-            // Same stable delivery key as the executor path (auto-outcome:<runId>), so a
-            // concurrent or earlier return is replayed instead of double-posted. Progress-only
-            // transcripts (all mid-turn user-progress messages) return as status.
-            const intent =
-              run.status === "failed" ||
-              stuckCancel ||
-              !transcript.text.trim() ||
-              transcript.progressOnly
-                ? "status"
-                : ("result" as const);
+            // These source runs are terminal. Returning "status" would leave the
+            // coordinator waiting forever for a result after a crash or failure.
+            // The stable delivery key (auto-outcome:<runId>) prevents double delivery.
+            const intent = "result" as const;
             const returned = await returnBotMessageOutcome(
               { prisma: deps.prisma, jobs: deps.jobs, events },
               run,

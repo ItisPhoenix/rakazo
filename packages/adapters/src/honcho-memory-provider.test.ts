@@ -208,6 +208,43 @@ describe("HonchoMemoryProvider", () => {
     expect(calls(fetchMock).filter((call) => call.path.endsWith("/peers"))).toHaveLength(2);
   });
 
+  it("uses direct conclusion retrieval when the provider opts in", async () => {
+    const fetch = honchoFetch();
+    const memory = provider(fetch, { recallStrategy: "conclusions" });
+    await memory.save(
+      {
+        content: "Prefers short answers",
+        scope: "isolated",
+        botId: "bot-1",
+        source: { kind: "durable" },
+      },
+      context,
+    );
+    const result = await memory.recall(
+      { query: "answer preference?", scope: "isolated", botId: "bot-1", limit: 5 },
+      context,
+    );
+    expect(result).toMatchObject({
+      ok: true,
+      value: [{ memory: "Prefers short answers", provenance: "honcho" }],
+    });
+    expect(calls(fetch).filter((call) => call.path.endsWith("/chat"))).toHaveLength(0);
+  });
+
+  it("falls back to peer reasoning when direct search has no stored facts", async () => {
+    const fetch = honchoFetch({ "bot-bot-1": "Relevant response from chat" });
+    const memory = provider(fetch, { recallStrategy: "conclusions" });
+    const result = await memory.recall(
+      { query: "answer preference?", scope: "isolated", botId: "bot-1", limit: 3 },
+      context,
+    );
+    expect(result).toMatchObject({
+      ok: true,
+      value: [{ memory: "Relevant response from chat" }],
+    });
+    expect(calls(fetch).filter((call) => call.path.endsWith("/chat"))).toHaveLength(1);
+  });
+
   it("shares facts across members while keeping isolated facts per bot across users and routines", async () => {
     const fetch = honchoFetch();
     const memory = provider(fetch);
@@ -953,6 +990,12 @@ describe("Honcho local mode", () => {
       return Response.json({});
     });
   }
+
+  it("validates recall strategy rather than silently accepting a typo", () => {
+    expect(() =>
+      createHonchoProvider({ recallStrategy: "unsafe-fallback" }, { apiKey: "honcho-admin-token" }),
+    ).toThrow("recallStrategy must be auto, conclusions, or reasoned");
+  });
 
   it("requires the deployment owner for every mode except Honcho Cloud", () => {
     expect(honchoRequiresPrivateEndpoint({})).toBe(false);

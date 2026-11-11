@@ -23,6 +23,8 @@ export function HonchoSettingsForm({ busy, onConnect }: MemoryProviderSettingsFo
   const [userPeer, setUserPeer] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [workspace, setWorkspace] = useState("");
+  const recallStrategyId = useId();
+  const [recallStrategy, setRecallStrategy] = useState<"auto" | "conclusions" | "reasoned">("auto");
   const workspaceValid = RESOURCE_ID_PATTERN.test(workspace.trim());
   const showUserPeer = workspace.trim().length > 0;
   const userPeerFormatValid = RESOURCE_ID_PATTERN.test(userPeer.trim());
@@ -41,6 +43,7 @@ export function HonchoSettingsForm({ busy, onConnect }: MemoryProviderSettingsFo
         ...(mode === "local" ? { mode, baseUrl: baseUrl.trim() } : {}),
         ...(showUserPeer && userPeer.trim() ? { userPeerId: userPeer.trim() } : {}),
         ...(workspace.trim() ? { workspaceId: workspace.trim() } : {}),
+        recallStrategy,
       },
       credentials: { apiKey: apiKey.trim() },
     };
@@ -126,6 +129,31 @@ export function HonchoSettingsForm({ busy, onConnect }: MemoryProviderSettingsFo
           ) : null}
         </Field>
       ) : null}
+
+      <Field className="mt-4">
+        <FieldLabel htmlFor={recallStrategyId}>
+          <Trans>Recall method</Trans>
+        </FieldLabel>
+        <select
+          id={recallStrategyId}
+          value={recallStrategy}
+          disabled={busy}
+          onChange={(event) =>
+            setRecallStrategy(event.target.value as "auto" | "conclusions" | "reasoned")
+          }
+          className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+        >
+          <option value="auto">Automatic</option>
+          <option value="conclusions">Stored conclusions (faster)</option>
+          <option value="reasoned">Reasoned recall (peer chat)</option>
+        </select>
+        <p className="mt-2 text-body-sm text-muted-foreground">
+          <Trans>
+            Choose how this Space searches memories. An external user peer always uses reasoned
+            recall.
+          </Trans>
+        </p>
+      </Field>
 
       <Button
         type="button"

@@ -123,30 +123,25 @@ export function dockerComputerToolInstruction(
   offeredToolNames?: ReadonlySet<string>,
 ): string | undefined {
   if (computerKind !== "docker") return undefined;
-  const navigate = builtinOffered(disabled, "browser_navigate");
-  const act = builtinOffered(disabled, "browser_act");
-  const takeover = builtinOffered(disabled, "request_takeover");
+  const isOffered = (name: string) =>
+    builtinOffered(disabled, name) && (!offeredToolNames || offeredToolNames.has(name));
+  const navigate = isOffered("browser_navigate");
+  const act = isOffered("browser_act");
+  const takeover = isOffered("request_takeover");
+  // Do not claim a tool or distribution is installed just because the provider is Docker.
+  // Images, workspaces and installed packages differ across self-hosted deployments.
   const parts = [
-    "For Python CLI tools, use `uv tool install <package>`; it installs without sudo and keeps tools under this computer's persistent home. GitHub's `gh` CLI is installed. `pdftotext`, `pandoc`, and `openpyxl` are available to extract text from PDFs, documents, and spreadsheets.",
+    "The computer runs in a container. Its operating system, workspace paths, tools, privileges, and installed packages vary by deployment. Inspect the live environment before choosing commands; never assume sudo, Python, Git, a package manager, or a browser is available.",
   ];
-  // Describe the actual Docker environment only when this run exposes shell.
-  // Tool selection can omit shell even when bot settings haven't disabled it.
-  const shellOffered = offeredToolNames
-    ? offeredToolNames.has("shell")
-    : builtinOffered(disabled, "shell");
+  const shellOffered = isOffered("shell");
   if (shellOffered) {
     parts.push(
-      "This computer is a Debian bookworm container running unprivileged with persistent home `/home/rakazo`. There is no sudo, systemd, cron, or Docker daemon; system packages cannot be installed with `apt` at runtime, and `pip` is not installed, so `uv` is the way to add Python packages (`uv run --with <package>` runs a script with a library). Also installed: `git`, `ssh`, `curl`, `jq`, `unzip`, ImageMagick, and a graphical browser (Chromium by default).",
-    );
-  }
-  if (builtinOffered(disabled, "shell")) {
-    parts.push(
-      "Python 3 is installed as `python3`. For ordinary file processing, use `python3 -c` with a quoted script; interpreter heredocs are blocked by the desktop guard. If `python` is not found, retry with `python3`. A command-syntax refusal is not a filesystem permission error; continue ordinary file work with supported tools.",
+      "You can use the shell. Check pwd, id, /etc/os-release (if present), and command -v for needed tools. Discover the actual home directory from the shell rather than assuming a path. Use only installation methods your permissions and the environment allow. If a tool is missing, use another available method or explain the blocker.",
     );
   }
   if (navigate && act) {
     parts.push(
-      'To authenticate `gh`, run `LOG=$(mktemp /tmp/gh-login.XXXXXX); nohup script -qec \'gh auth login --hostname github.com --web --git-protocol https\' "$LOG" >/dev/null 2>&1 & echo "$LOG"` — keep that printed path, read the one-time code from it, browser_navigate to https://github.com/login/device, and browser_act the code. Completing that page authorizes the CLI OAuth app and stores the credential under the persistent home; it does not by itself create a Chromium github.com session.',
+      "If the GitHub CLI is installed and authentication is required, use its interactive login flow with the owner's consent. Never expose a token or one-time code in the final response.",
     );
   }
   if (takeover) {

@@ -104,6 +104,10 @@ function parseHonchoConnection(
   if (workspaceId && !/^[A-Za-z0-9_-]{1,512}$/.test(workspaceId)) {
     throw new Error("workspaceId may contain only letters, digits, '_' and '-'");
   }
+  const recallStrategy = settings.recallStrategy?.trim() ?? "auto";
+  if (!["auto", "conclusions", "reasoned"].includes(recallStrategy)) {
+    throw new Error("recallStrategy must be auto, conclusions, or reasoned");
+  }
   const userPeerId = settings.userPeerId?.trim() ?? "";
   if (userPeerId && !/^[A-Za-z0-9_-]{1,512}$/.test(userPeerId)) {
     throw new Error("userPeerId may contain only letters, digits, '_' and '-'");
@@ -169,6 +173,9 @@ export async function prepareHonchoConnection(
     settings: {
       ...(local ? { mode: "local", baseUrl: connection.baseUrl } : {}),
       reasoningLevel: connection.reasoningLevel,
+      ...(settings.recallStrategy?.trim()
+        ? { recallStrategy: settings.recallStrategy.trim() }
+        : {}),
       ...(workspaceId ? { workspaceId } : {}),
       ...(userPeerId ? { userPeerId } : {}),
     },
@@ -280,13 +287,18 @@ export class HonchoMemoryProvider implements SemanticMemoryProvider {
     );
     if (!ready.ok) return ready;
 
-    // Local low/minimal recall uses stored semantic conclusions directly.
-    // Preserve Peer Chat for higher reasoning and external user peers.
-    if (
-      this.settings.mode === "local" &&
-      (this.connection.reasoningLevel === "low" || this.connection.reasoningLevel === "minimal") &&
-      !this.settings.userPeerId?.trim()
-    ) {
+    // The provider can choose fast conclusion search or reasoned peer chat. Per-provider
+    // settings override the old local/low-only heuristic, with auto retaining that default.
+    // External user peers always need the peer-chat path so their perspective is included.
+    const recallStrategy = this.settings.recallStrategy?.trim() || "auto";
+    const directConclusions =
+      !this.settings.userPeerId?.trim() &&
+      (recallStrategy === "conclusions" ||
+        (recallStrategy === "auto" &&
+          this.settings.mode === "local" &&
+          (this.connection.reasoningLevel === "low" ||
+            this.connection.reasoningLevel === "minimal")));
+    if (directConclusions) {
       const observers = recallObservers(request.scope, request.botId);
       const limit = Math.max(0, request.limit);
       if (limit === 0) return { ok: true, value: [] };
@@ -301,15 +313,16 @@ export class HonchoMemoryProvider implements SemanticMemoryProvider {
               query: request.query,
               observerId: entity,
               observedId: SHARED_PEER_ID,
-              topK: Math.min(Math.max(limit * 4, 4), 40),
+              topK: Math.min(Math.max(limit * 4, 4), MAX_COPIES_PER_SEARCH),
             },
             context.signal,
           ),
         })),
       );
 
-      // Use any successful search; otherwise fall back to Peer Chat.
-      if (searched.some(({ result }) => result.ok)) {
+      // Even an explicit fast search can return no stored facts: try reasoned recall
+      // rather than treating an empty index as proof nothing is relevant.
+      if (searched.some(({ result }) => result.ok && result.value.length > 0)) {
         const groups = searched.map(({ entity, result }) => {
           const items: SemanticMemoryResult[] = [];
           if (!result.ok) return items;

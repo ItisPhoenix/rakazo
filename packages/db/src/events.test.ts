@@ -166,8 +166,8 @@ describe("single owner reply for delegated results", () => {
       blocks: [
         {
           ...ivyResult.blocks[0]!,
-          intent: "status" as const,
-          text: "Could not complete the delegated request: provider unavailable",
+          intent: "result" as const,
+          text: "Provider unavailable",
         },
       ],
     };

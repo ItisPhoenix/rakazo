@@ -80,8 +80,19 @@ export async function createReplyState(
     select: { blocks: true, clientNonce: true },
   });
   for (const message of priorProgress) {
-    if (!isUserProgressClientNonce(message.clientNonce)) continue;
     const blocks = Array.isArray(message.blocks) ? (message.blocks as MessageBlock[]) : [];
+    // Rehydrate delegation from durable message history after worker restarts.
+    // The in-memory flag alone can otherwise leak a progress reply on recovery.
+    if (
+      blocks.some(
+        (block) =>
+          block.kind === "bot_message_sent" &&
+          (block.intent === undefined || block.intent === "request" || block.intent === "question"),
+      )
+    ) {
+      reply.delegatedRequestSent = true;
+    }
+    if (!isUserProgressClientNonce(message.clientNonce)) continue;
     const text = messageBlocksText(blocks).trim();
     if (!text) continue;
     reply.midTurnUserTexts.push(text);
