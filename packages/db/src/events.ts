@@ -162,6 +162,8 @@ export type FinalizeRunInput = FinalizeRunBase &
         error: string;
         /** Reply text the user saw streaming before the failure, kept as a bot message. */
         partialReply?: MessageBlock[];
+        /** Durable internal learning review for meaningful failed work. */
+        learningReview?: boolean;
       }
   );
 
@@ -1024,7 +1026,9 @@ async function finalizeRunOnce(
           ? input.learningReview
             ? { learningReview: true }
             : {}
-          : { error: input.error },
+          : input.learningReview
+            ? { error: input.error, learningReview: true }
+            : { error: input.error },
     });
     await tx.event.deleteMany({
       where: { runId: input.runId, ...transientRunEventsWhere() },
