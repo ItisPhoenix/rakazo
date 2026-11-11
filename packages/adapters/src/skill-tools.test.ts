@@ -27,7 +27,7 @@ function makePrisma(rows: Array<Record<string, unknown>> = []) {
       ),
       findFirst: vi.fn(async ({ where }: { where: Scope & { id: string } }) => {
         const row = store.find((item) => item.id === where.id && inScope(item, where));
-        return row ? { files: row.files ?? null } : null;
+        return row ? { ...row, files: row.files ?? null } : null;
       }),
       create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
         const row = {
