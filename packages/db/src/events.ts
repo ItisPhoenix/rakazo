@@ -749,15 +749,12 @@ export function consolidatedDelegationReady(
           (block.intent === "status" &&
             block.text.startsWith("Could not complete the delegated request:"))) &&
         requests.some(
-          (request) =>
-            request.id === message.replyToMessageId && request.botId === block.fromBotId,
+          (request) => request.id === message.replyToMessageId && request.botId === block.fromBotId,
         ),
     ),
   );
   if (
-    requests.some(
-      (request) => !terminal.some((message) => message.replyToMessageId === request.id),
-    )
+    requests.some((request) => !terminal.some((message) => message.replyToMessageId === request.id))
   )
     return false;
   // Only the run awakened by the newest terminal result can see all earlier results.
@@ -816,15 +813,15 @@ async function delegatedReplyGate(
   if (
     !originalSend?.runId ||
     originalSend.threadId !== input.threadId ||
-    !(Array.isArray(originalSend.blocks) &&
+    !(
+      Array.isArray(originalSend.blocks) &&
       (originalSend.blocks as MessageBlock[]).some(
         (block) =>
           block.kind === "bot_message_sent" &&
           fromBotIds.includes(block.toBotId) &&
-          (block.intent === undefined ||
-            block.intent === "request" ||
-            block.intent === "question"),
-      ))
+          (block.intent === undefined || block.intent === "request" || block.intent === "question"),
+      )
+    )
   )
     return null;
   const originRun = await tx.run.findUnique({
@@ -962,8 +959,7 @@ async function finalizeRunOnce(
       });
     }
     let firstResponse = false;
-    const gate =
-      input.outcome === "completed" ? await delegatedReplyGate(tx, input) : null;
+    const gate = input.outcome === "completed" ? await delegatedReplyGate(tx, input) : null;
     let replySuppressed = gate?.suppress === true;
     let replyBlocks =
       input.outcome === "completed"
