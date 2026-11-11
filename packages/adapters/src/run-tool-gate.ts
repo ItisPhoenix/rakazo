@@ -80,8 +80,8 @@ import { callPaidService } from "./run-tools-integrations.js";
 import { USER_COMPUTER_TOOLS, userComputerGate } from "./run-tools-user-computer.js";
 import { connectorTrustKeys } from "./run-trust.js";
 import { watchFromTool } from "./schedule-tools.js";
-import { isStrategicInitiativeRun, strategicInitiativeToolAllowed } from "./strategic-initiative.js";
 import { pagePaymentPrecheck, paysWithWallet } from "./spending-gate.js";
+import { isStrategicInitiativeRun, strategicInitiativeToolAllowed } from "./strategic-initiative.js";
 
 export type AppliedEffect = Awaited<ReturnType<typeof recordEffect>>;
 
