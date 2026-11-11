@@ -1056,6 +1056,12 @@ export async function failRun(
       ? [{ kind: "text" as const, text: partialText }]
       : [];
   await ctx.settleRunningHelpers();
+  const shouldReview = postTaskReviewEligible({
+    run,
+    didUsefulWork: reply.toolCalls.length > 0,
+    handedOff: ctx.state.handedOff,
+    resultText: message,
+  });
   const failed = await deps.events.finalizeRun({
     spaceId: run.spaceId,
     threadId: thread.id,
@@ -1067,9 +1073,16 @@ export async function failRun(
     leaseFence: ctx.fence,
     outcome: "failed",
     error: message,
+    learningReview: shouldReview,
     ...(partialReply.length > 0 ? { partialReply } : {}),
   });
   if (!failed) return;
+  if (shouldReview) {
+    await queuePostTaskReview(
+      { prisma: deps.prisma, jobs: deps.jobs },
+      { run, didUsefulWork: true, handedOff: false, resultText: message },
+    ).catch((reviewError) => getLogger().error("failed-task review scheduling", reviewError));
+  }
   if (
     error instanceof TransientModelError ||
     error instanceof ModelAccountError ||
