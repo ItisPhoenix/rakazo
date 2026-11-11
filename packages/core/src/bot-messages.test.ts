@@ -427,14 +427,22 @@ describe("inbound wake prompt", () => {
   });
 
   it("keeps intermediate statuses internal", () => {
-    const status = buildBotMessageWakePrompt({ from: bots[0]!, text: "Checking versions", intent: "status" });
+    const status = buildBotMessageWakePrompt({
+      from: bots[0]!,
+      text: "Checking versions",
+      intent: "status",
+    });
     expect(status).toContain("NO_RESPONSE");
     expect(status).toContain("intermediate delegated-work status");
     expect(status).not.toContain("Relay it to the user now");
   });
 
   it("collects delegated results for a single consolidated answer", () => {
-    const result = buildBotMessageWakePrompt({ from: bots[0]!, text: "Audit complete", intent: "result" });
+    const result = buildBotMessageWakePrompt({
+      from: bots[0]!,
+      text: "Audit complete",
+      intent: "result",
+    });
     expect(result).toContain("ONE consolidated final answer");
     expect(result).toContain("NO_RESPONSE");
     expect(result).not.toContain("Relay it to the user now");
