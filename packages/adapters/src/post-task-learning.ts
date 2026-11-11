@@ -176,7 +176,7 @@ export async function queuePostTaskReview(
       // Match the thread-before-run lock order used by message creation.
       await tx.$queryRaw`SELECT id FROM threads WHERE id = ${run.threadId} FOR UPDATE`;
       const source = await tx.run.findFirst({
-        where: { id: run.id, spaceId: run.spaceId, status: "completed" },
+        where: { id: run.id, spaceId: run.spaceId, status: { in: ["completed", "failed"] } },
         select: { id: true },
       });
       if (!source) return null;
@@ -256,7 +256,7 @@ export function createPostTaskReviewReconciler(
   return async (): Promise<number> => {
     const events = await deps.prisma.event.findMany({
       where: {
-        type: "run.completed",
+        type: { in: ["run.completed", "run.failed"] },
         runId: { not: null },
         payload: { path: ["learningReview"], equals: true },
         ...(cursor
@@ -276,7 +276,11 @@ export function createPostTaskReviewReconciler(
     for (const event of events) {
       if (!event.runId) continue;
       const source = await deps.prisma.run.findFirst({
-        where: { id: event.runId, spaceId: event.spaceId, status: "completed" },
+        where: {
+          id: event.runId,
+          spaceId: event.spaceId,
+          status: { in: ["completed", "failed"] },
+        },
         select: {
           id: true,
           spaceId: true,
@@ -285,6 +289,8 @@ export function createPostTaskReviewReconciler(
           userId: true,
           trigger: true,
           clientNonce: true,
+          status: true,
+          error: true,
         },
       });
       if (!source || isPostTaskReview(source)) continue;
@@ -304,13 +310,16 @@ export function createPostTaskReviewReconciler(
         take: 3,
         select: { blocks: true },
       });
-      const resultText = messages
-        .map((message) =>
-          messageBlocksText(
-            Array.isArray(message.blocks) ? (message.blocks as MessageBlock[]) : [],
-          ).trim(),
-        )
-        .find((text) => text.length > 0);
+      const resultText =
+        source.status === "failed"
+          ? source.error?.trim()
+          : messages
+              .map((message) =>
+                messageBlocksText(
+                  Array.isArray(message.blocks) ? (message.blocks as MessageBlock[]) : [],
+                ).trim(),
+              )
+              .find((text) => text.length > 0);
       if (!resultText) continue;
       if (
         await queuePostTaskReview(deps, {
