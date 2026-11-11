@@ -3,6 +3,7 @@ import { BUILTIN_AGENT_SKILLS } from "@rakazo/adapters";
 import type { Actor, AgentSkill, AgentSkillSource } from "@rakazo/contracts";
 import type { SkillSource } from "@rakazo/core";
 import {
+  archiveSkillContent,
   buildSkillMd,
   findSkillByName,
   isSkillReadOnly,
@@ -258,11 +259,17 @@ export function createAgentSkillsService(prisma: PrismaClient) {
               existing.id,
             );
           return tx.agentSkill.updateMany({
-            where: { id: existing.id, ...availableInSpace(actor), source: "user" },
+            where: {
+              id: existing.id,
+              ...availableInSpace(actor),
+              source: "user",
+              updatedAt: existing.updatedAt,
+            },
             data: {
               name: resolved.name,
               description: resolved.description,
               content: resolved.content,
+              files: archiveSkillContent(existing.files, existing.content),
             },
           });
         });
