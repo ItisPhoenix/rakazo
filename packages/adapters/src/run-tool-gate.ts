@@ -48,6 +48,7 @@ import {
 } from "./auto-review.js";
 import { reviewWithBackups } from "./auto-review-backups.js";
 import { RAKAZO_DOCS_URLS } from "./builtin-skills.js";
+import { isPostTaskReview, postTaskReviewToolAllowed } from "./post-task-learning.js";
 import type { ExecutorDeps } from "./executor-deps.js";
 import { CATALOG_LOAD, CATALOG_SEARCH } from "./lazy-tool-catalog.js";
 import { findConnectedModelCredential } from "./model-selection.js";
@@ -202,6 +203,13 @@ export async function gateToolCall(
         error:
           "This unattended run cannot use an unclassified or mutating tool. Ask the owner to start that action explicitly.",
       },
+    };
+  }
+  // An internal review may only maintain local knowledge and reusable skills.
+  // Recheck at dispatch so a hidden catalog route cannot expose extra actions.
+  if (isPostTaskReview(run) && (!postTaskReviewToolAllowed(name) || viaConnector)) {
+    return {
+      result: { error: "This internal learning run cannot perform external or unrelated actions." },
     };
   }
   const requiresUnattendedApproval =
