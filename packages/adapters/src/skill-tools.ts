@@ -294,7 +294,9 @@ export async function skillUpdateFromTool(
     });
     if (!current) return { error: SHARED_SKILL_ERROR };
     if (current.content !== existing.content) {
-      return { error: "Skill changed while this edit was prepared. Read it again before retrying." };
+      return {
+        error: "Skill changed while this edit was prepared. Read it again before retrying.",
+      };
     }
     const updated = await prisma.agentSkill.updateMany({
       where: {
