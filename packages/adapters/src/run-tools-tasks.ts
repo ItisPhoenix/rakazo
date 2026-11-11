@@ -300,13 +300,14 @@ export const taskTools: ToolHandlers = {
         file: args.file ? String(args.file) : undefined,
       },
     );
-    if (typeof result.name === "string" && !("error" in result)) {
+    const skillName = result.name;
+    if (typeof skillName === "string" && !("error" in result)) {
       const records = await listAgentSkillRecords(deps.prisma, {
         spaceId: run.spaceId,
         userId: run.userId,
       });
       const skill = records.find(
-        (entry) => entry.name.toLowerCase() === result.name.toLowerCase(),
+        (entry) => entry.name.toLowerCase() === skillName.toLowerCase(),
       );
       if (skill) {
         await recordSkillEvidence(ctx, "skill.consulted", { skillId: skill.id });
