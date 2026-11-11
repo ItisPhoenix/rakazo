@@ -13,6 +13,7 @@ import {
   secretAskNotification,
   subagentMarksUnread,
 } from "./run-notifications.js";
+import { createReplyState } from "./run-progress.js";
 import {
   completionMessageSegments,
   DELEGATED_EMPTY_NOTICE,
@@ -27,7 +28,6 @@ import {
   runReplyMode,
   TICKET_SILENT_REPLY_GUIDANCE,
 } from "./run-replies.js";
-import { createReplyState } from "./run-progress.js";
 import { handoffEndedTurn } from "./run-turn.js";
 import {
   couldBecomeNoResponse,
