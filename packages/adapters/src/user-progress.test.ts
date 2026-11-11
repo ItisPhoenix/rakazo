@@ -154,17 +154,20 @@ describe("botMessageOutcomeFromMidTurn", () => {
     });
   });
 
-  it("returns mid-turn progress as status when there is no final reply", () => {
+  it("returns a terminal result when the specialist has only progress", () => {
     expect(
       botMessageOutcomeFromMidTurn("", ["Checking calendars…", "Found three free slots."]),
     ).toEqual({
-      text: "Checking calendars…\n\nFound three free slots.",
-      intent: "status",
+      text: "The delegated bot finished without a final summary. Its last progress was:\nChecking calendars…\n\nFound three free slots.",
+      intent: "result",
     });
   });
 
-  it("returns null when nothing was posted", () => {
-    expect(botMessageOutcomeFromMidTurn("  ", [])).toBeNull();
+  it("reports a missing summary rather than leaving the coordinator waiting", () => {
+    expect(botMessageOutcomeFromMidTurn("  ", [])).toEqual({
+      text: "The delegated bot completed its turn without a written summary.",
+      intent: "result",
+    });
   });
 });
 
