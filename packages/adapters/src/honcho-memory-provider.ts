@@ -302,6 +302,8 @@ export class HonchoMemoryProvider implements SemanticMemoryProvider {
       const observers = recallObservers(request.scope, request.botId);
       const limit = Math.max(0, request.limit);
       if (limit === 0) return { ok: true, value: [] };
+      const limit = Math.max(0, request.limit);
+      if (limit === 0) return { ok: true, value: [] };
 
       const searched = await Promise.all(
         observers.map(async (entity) => ({
