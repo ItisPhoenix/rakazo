@@ -232,6 +232,7 @@ export async function flushProgress(ctx: RunContext) {
     ctx.scripted ||
     !reply.pendingProgress ||
     run.trigger === "routine" ||
+    reply.delegatedRequestSent ||
     isBackgroundRunTrigger(run.trigger) ||
     progressHeldForSilence(ctx)
   )
