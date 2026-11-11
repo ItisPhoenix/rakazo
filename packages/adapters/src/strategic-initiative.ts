@@ -28,11 +28,12 @@ const MAX_STALE_ITEMS_SCANNED = 50;
 const MAX_NOTES_CHARS = 220;
 // Read-only builtins are defined once in the product tool catalog. New tools appear
 // when their actual effect is classified there; no per-bot or deployment-specific names.
-// These local computer/workspace effects are permitted only under the existing sandbox,
-// approval and execution gates. Unknown or external mutations fail closed.
+// Local computer/workspace effects stay under existing permission and execution gates.
+// Unknown or external mutations fail closed.
 const PROACTIVE_LOCAL_EFFECTS = new Set([
   "ask_user",
   "message_user",
+  "message_bot",
   "computer_act",
   "browser_navigate",
   "browser_act",
@@ -42,6 +43,7 @@ const PROACTIVE_LOCAL_EFFECTS = new Set([
   "launch_app",
   "remember",
   "save_memory",
+  "scratchpad_add",
   "scratchpad_update",
   "scratchpad_complete",
   "load_skill",
