@@ -1075,7 +1075,7 @@ export async function failRun(
       { ...run, sourceMessageId: run.sourceMessageId },
       { id: bot.id, name: bot.name },
       `Could not complete the delegated request: ${message}`,
-      "status",
+      "result",
       { forceUnread: true },
     ).catch((returnError) => getLogger().error("bot message failure return", returnError));
   }
