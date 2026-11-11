@@ -1,10 +1,10 @@
 import type { JobPublisher } from "@rakazo/adapter-kit";
 import { runContinueJob } from "@rakazo/adapter-kit";
+import type { MessageBlock } from "@rakazo/contracts";
 import { escapePromptData, truncatePlainText } from "@rakazo/core";
 import type { PrismaClient } from "@rakazo/db";
 import { isUniqueViolation } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
-import type { MessageBlock } from "@rakazo/contracts";
 import { messageBlocksText } from "./run-replies.js";
 import { listAgentSkillRecords } from "./skill-tools.js";
 
@@ -243,7 +243,6 @@ export async function queuePostTaskReview(
   });
   return true;
 }
-
 
 /**
  * Repair a crash between the original run's atomic completion marker and the
