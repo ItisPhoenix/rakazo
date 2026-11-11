@@ -81,6 +81,7 @@ describe("post-task learning", () => {
   it("repairs an atomically marked completion after a worker interruption", async () => {
     const enqueue = vi.fn(async () => undefined);
     const tx = {
+      $queryRaw: vi.fn(async () => []),
       run: {
         findFirst: vi.fn(async () => ({ id: source.id })),
         findUnique: vi.fn(async () => null),
@@ -124,6 +125,7 @@ describe("post-task learning", () => {
     const enqueue = vi.fn(async () => undefined);
     const created: Array<Record<string, unknown>> = [];
     const tx = {
+      $queryRaw: vi.fn(async () => []),
       run: {
         findFirst: vi.fn(async () => ({ id: source.id })),
         findUnique: vi.fn(async () => null),
