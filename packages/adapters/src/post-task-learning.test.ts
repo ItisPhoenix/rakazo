@@ -7,6 +7,7 @@ import {
   isPostTaskReview,
   postTaskReviewEligible,
   postTaskReviewPrompt,
+  postTaskReviewSourceRunId,
   postTaskReviewToolAllowed,
   queuePostTaskReview,
 } from "./post-task-learning.js";
@@ -27,6 +28,8 @@ describe("post-task learning", () => {
     expect(isPostTaskReview(input)).toBe(true);
     expect(isPostTaskReview({ ...input, trigger: "user" })).toBe(false);
     expect(isPostTaskReview({ ...input, clientNonce: "manual-run" })).toBe(false);
+    expect(postTaskReviewSourceRunId(input)).toBe("source-run");
+    expect(postTaskReviewSourceRunId({ ...input, trigger: "user" })).toBeUndefined();
   });
 
   it("exposes only local knowledge tools, including no connector or external actions", () => {
