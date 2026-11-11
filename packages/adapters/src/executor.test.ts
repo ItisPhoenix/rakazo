@@ -1865,48 +1865,37 @@ describe("dockerComputerToolInstruction", () => {
   });
 
   it("describes shell capabilities only when shell is actually offered", () => {
-    const hidden = dockerComputerToolInstruction(
-      "docker",
-      undefined,
-      new Set(["browser_snapshot"]),
-    ) ?? "";
+    const hiddenTools = new Set(["browser_snapshot"]);
+    const hidden = dockerComputerToolInstruction("docker", undefined, hiddenTools) ?? "";
     expect(hidden).not.toContain("You can use the shell");
     expect(hidden).not.toContain("Check pwd");
-    const available = dockerComputerToolInstruction("docker", undefined, new Set(["shell"])) ?? "";
-    expect(available).toContain("You can use the shell");
-    expect(available).toContain("Check pwd");
+    const offered = dockerComputerToolInstruction("docker", undefined, new Set(["shell"])) ?? "";
+    expect(offered).toContain("You can use the shell");
+    expect(offered).toContain("Check pwd");
   });
 
   it("does not claim the shell works when the user disabled it", () => {
-    const instruction =
-      dockerComputerToolInstruction("docker", new Set(["shell"])) ?? "";
+    const instruction = dockerComputerToolInstruction("docker", new Set(["shell"])) ?? "";
     expect(instruction).not.toContain("You can use the shell");
     expect(instruction).toContain("Never use `--with-token`");
   });
 
   it("only suggests GitHub interaction when browser tools are offered", () => {
-    const noBrowser =
-      dockerComputerToolInstruction("docker", undefined, new Set(["shell"])) ?? "";
+    const noBrowser = dockerComputerToolInstruction("docker", undefined, new Set(["shell"])) ?? "";
     expect(noBrowser).not.toContain("GitHub CLI is installed");
     expect(noBrowser).not.toContain("request_takeover");
-    const browser =
-      dockerComputerToolInstruction(
-        "docker",
-        undefined,
-        new Set(["shell", "browser_navigate", "browser_act"]),
-      ) ?? "";
+    const browserTools = new Set(["shell", "browser_navigate", "browser_act"]);
+    const browser = dockerComputerToolInstruction("docker", undefined, browserTools) ?? "";
     expect(browser).toContain("If the GitHub CLI is installed");
     expect(browser).not.toContain("request_takeover");
   });
 
   it("respects disabled takeover and browser tools", () => {
-    const disabled = dockerComputerToolInstruction(
-      "docker",
-      new Set(["browser_navigate", "browser_act", "request_takeover"]),
-    ) ?? "";
-    expect(disabled).not.toContain("request_takeover");
-    expect(disabled).not.toContain("If the GitHub CLI is installed");
-    expect(disabled).toContain("Never use `--with-token`");
+    const disabled = new Set(["browser_navigate", "browser_act", "request_takeover"]);
+    const instruction = dockerComputerToolInstruction("docker", disabled) ?? "";
+    expect(instruction).not.toContain("request_takeover");
+    expect(instruction).not.toContain("If the GitHub CLI is installed");
+    expect(instruction).toContain("Never use `--with-token`");
   });
 
   it("does not add Docker guidance to other computer providers", () => {
