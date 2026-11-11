@@ -26,6 +26,9 @@ import {
   TICKET_SILENT_REPLY_GUIDANCE,
 } from "./run-replies.js";
 import { handoffEndedTurn } from "./run-turn.js";
+import { createReplyState } from "./run-progress.js";
+import type { ExecutorDeps } from "./executor-deps.js";
+import type { Run } from "@rakazo/db";
 import {
   couldBecomeNoResponse,
   isExactNoResponse,
@@ -36,6 +39,28 @@ import {
   stripStrayNoResponse,
 } from "./silent-reply.js";
 import { finalBlocksAfterMidTurnProgress } from "./user-progress.js";
+
+describe("restart-safe delegated progress state", () => {
+  it("recovers the outstanding delegation from persisted run messages", async () => {
+    const deps = {
+      prisma: {
+        message: {
+          findMany: async () => [
+            {
+              clientNonce: null,
+              blocks: [
+                { kind: "bot_message_sent", toBotId: "bot-2", intent: "request" },
+              ],
+            },
+          ],
+        },
+      },
+    } as unknown as ExecutorDeps;
+    const reply = await createReplyState(deps, { id: "run-1", startedAt: null } as Run, []);
+    expect(reply.delegatedRequestSent).toBe(true);
+    expect(reply.midTurnUserTexts).toEqual([]);
+  });
+});
 
 describe("internal bot-message reply guidance", () => {
   it("discourages interim progress and requests a consolidated outcome", () => {
