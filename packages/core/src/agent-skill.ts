@@ -119,7 +119,10 @@ export function buildSkillMd(input: {
 }
 
 /** Preserve the previous usable procedure on every change, so it can be restored. */
-export function archiveSkillContent(files: unknown, previousContent: string): Record<string, string> {
+export function archiveSkillContent(
+  files: unknown,
+  previousContent: string,
+): Record<string, string> {
   const stored: Record<string, string> =
     files && typeof files === "object" && !Array.isArray(files)
       ? Object.fromEntries(
