@@ -83,7 +83,7 @@ class RakazoWristModule : Module() {
       requireConnectPermission()
       // Initial milestone uses a single small GATT packet; no unverified fragmentation.
       require(title.isNotBlank() && message.isNotBlank()) { "Notification must have text" }
-      require(title.none { it.isISOControl() } && message.none { it.isISOControl() }) {
+      require(title.none { Character.isISOControl(it) } && message.none { Character.isISOControl(it) }) {
         "Notification contains control characters"
       }
       val titleBytes = title.toByteArray(Charsets.UTF_8)
