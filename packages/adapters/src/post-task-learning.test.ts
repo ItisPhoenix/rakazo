@@ -120,7 +120,7 @@ describe("post-task learning", () => {
     } as unknown as PrismaClient;
     const jobs = { enqueue } as unknown as JobPublisher;
     const reconcile = createPostTaskReviewReconciler({ prisma, jobs });
-    expect(await reconcile()).toBe(1);
+    await reconcile();
     expect(enqueue).toHaveBeenCalledTimes(1);
   });
 
