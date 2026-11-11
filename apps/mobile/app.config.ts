@@ -43,6 +43,19 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     };
   }
 
+  // An isolated Android test package prevents overwriting the owner's installed Rakazo app.
+  // This is used only by the Charlie Wrist lab build; production profiles are unchanged.
+  if (process.env.CHARLIE_WRIST_LAB === "1") {
+    result = {
+      ...result,
+      name: "Charlie Wrist Lab",
+      slug: "charlie-wrist-lab",
+      scheme: "charlie-wrist-lab",
+      android: { ...result.android, package: "com.rakazo.charliewristlab" },
+      updates: { ...result.updates, enabled: false },
+    };
+  }
+
   const googleServicesFile = process.env.GOOGLE_SERVICES_JSON;
   if (googleServicesFile) {
     result = { ...result, android: { ...result.android, googleServicesFile } };
