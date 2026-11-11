@@ -3,6 +3,7 @@ import {
   desktopProtectionGuardMessage,
   protectedComputerLifecycleRefusal,
 } from "./desktop-command-guard.js";
+import type { ProductEventType } from "@rakazo/contracts";
 import { getLogger } from "@rakazo/logging";
 import type { RunContext } from "./run-context.js";
 import type { ToolHandlers } from "./run-tool-gate.js";
@@ -73,7 +74,7 @@ export async function scheduleCreateRefusal(
 /** Store only skill identity and action evidence, never skill body or credentials. */
 async function recordSkillEvidence(
   ctx: RunContext,
-  type: string,
+  type: ProductEventType,
   payload: { skillId?: string; name: string },
 ): Promise<void> {
   await ctx.deps.events
