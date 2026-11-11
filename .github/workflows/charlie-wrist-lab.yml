@@ -1,0 +1,80 @@
+name: Charlie Wrist Lab APK
+
+on:
+  push:
+    branches:
+      - charlie-wrist/ble-foundation
+    paths:
+      - "apps/mobile/**"
+      - "packages/**"
+      - "pnpm-lock.yaml"
+      - "package.json"
+      - ".github/workflows/charlie-wrist-lab.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: charlie-wrist-lab-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: Compile isolated Android APK (no EAS token)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    env:
+      CI: "1"
+      CHARLIE_WRIST_LAB: "1"
+      EXPO_NO_TELEMETRY: "1"
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@48b5f213c81028ace310571dc5ec0fbbca0b2947 # v4.4.3
+
+      - name: Install reproducible dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type-check Android app without changing the fork's pinned Expo versions
+        run: pnpm --filter @rakazo/mobile exec tsc --noEmit -p tsconfig.json
+
+      - name: Generate isolated Android project
+        run: |
+          pnpm --filter @rakazo/mobile exec expo prebuild --platform android --no-install
+          grep -q 'com.rakazo.charliewristlab' apps/mobile/android/app/build.gradle || {
+            echo "Lab application ID was not applied. Aborting without a build."
+            exit 1
+          }
+
+      - name: Build self-contained APK for ARM64 phones
+        working-directory: apps/mobile/android
+        run: ./gradlew :app:assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon
+
+      - name: Check APK
+        run: |
+          test -s apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          unzip -t apps/mobile/android/app/build/outputs/apk/release/app-release.apk | tail -n 1
+
+      - name: Publish short-lived lab APK artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: charlie-wrist-lab-android-arm64
+          path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 3

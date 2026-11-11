@@ -754,6 +754,7 @@ export default function Account() {
               { title: t`Artifacts`, href: "/artifacts" },
               { title: t`Models`, href: "/models" },
               { title: t`Voice`, href: "/voice" },
+              ...(Platform.OS === "android" ? [{ title: "Charlie Wrist", href: "/wrist" } as const] : []),
             ] as const
           ).map(settingsLink)}
           <ApprovalModeRow key="approvals" approvals={approvals} disabled={pending} />
