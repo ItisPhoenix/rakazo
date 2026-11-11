@@ -40,11 +40,14 @@ export default function CharlieWristScreen() {
 
   useEffect(() => {
     const deviceSub = watchWristDevices((device) => {
-      setDevices((existing) =>
-        existing.some((value) => value.address === device.address)
-          ? existing
-          : [...existing, device].slice(0, 10),
-      );
+      setDevices((existing) => {
+        if (existing.some((value) => value.address === device.address)) return existing;
+        // Show likely Lunar Discovery advertisements first, then stronger nearby BLE signals.
+        // Addresses are used as in-memory selection keys only; they are not shown or uploaded.
+        return [...existing, device]
+          .sort((a, b) => Number(b.likelyWatch) - Number(a.likelyWatch) || b.rssi - a.rssi)
+          .slice(0, 30);
+      });
     });
     const stateSub = watchWristState((next) => {
       setConnection(next);
@@ -125,8 +128,9 @@ export default function CharlieWristScreen() {
           <View style={[styles.card, { backgroundColor: surface }]}>
             <Text style={[styles.section, { color: foreground }]}>1. Connect your watch</Text>
             <Text style={[styles.body, { color: muted }]}>
-              Disconnect nRF Connect and force-stop boAt Crest before connecting.
-              Scan and choose your watch below.
+              Keep your watch nearby with Bluetooth enabled. Disconnect nRF Connect
+              and force-stop boAt Crest. Android pairing is not required for this scan.
+              Choose a candidate below; the app verifies WA49V3 before allowing commands.
             </Text>
             {button("Scan for Lunar Discovery", () =>
               void run(async () => {
@@ -136,6 +140,18 @@ export default function CharlieWristScreen() {
                 }
                 await wrist.startScan();
               }), ready)}
+            {devices.length > 0 ? (
+              <Text style={[styles.body, { color: muted }]}>
+                {devices.length} nearby candidate{devices.length === 1 ? "" : "s"}.
+                A nearby device is NOT confirmed to be your watch until connected and verified.
+                Try the strongest or named Lunar Discovery candidate first.
+              </Text>
+            ) : connection.status === "scan-complete" ? (
+              <Text style={[styles.body, { color: muted }]}>
+                No nearby BLE candidates appeared. Keep the watch close, make sure Bluetooth
+                is enabled, then scan again. No pairing is needed yet.
+              </Text>
+            ) : null}
             {devices.map((device) => (
               <Pressable
                 key={device.address}
@@ -144,9 +160,12 @@ export default function CharlieWristScreen() {
                 onPress={() => void run(() => wrist.connect(device.address))}
                 style={[styles.device, { borderColor: dark ? "#4D676C" : "#D0E1E3" }]}
               >
-                <Text style={{ color: foreground, fontWeight: "700" }}>{device.name}</Text>
+                <Text style={{ color: foreground, fontWeight: "700" }}>
+                  {device.likelyWatch ? "Possible Lunar Discovery" : device.name}
+                </Text>
                 <Text style={{ color: muted, fontSize: 12 }}>
-                  Tap to connect · address stays on this phone
+                  {device.likelyWatch ? device.name + " · " : ""}
+                  Signal {device.rssi} dBm · Tap to verify model locally
                 </Text>
               </Pressable>
             ))}
