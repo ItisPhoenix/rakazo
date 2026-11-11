@@ -170,7 +170,13 @@ export async function skillReadFromTool(
 export async function skillCreateFromTool(
   prisma: PrismaClient,
   owner: SkillOwner,
-  input: { name?: string; description?: string; body?: string; content?: string },
+  input: {
+    name?: string;
+    description?: string;
+    body?: string;
+    content?: string;
+    sourceRunId?: string;
+  },
 ): Promise<Record<string, unknown>> {
   let name = "";
   let description = "";
@@ -210,6 +216,16 @@ export async function skillCreateFromTool(
         description,
         content,
         source: "user",
+        ...(input.sourceRunId
+          ? {
+              files: {
+                "metadata/learning.json": JSON.stringify({
+                  sourceRunId: input.sourceRunId,
+                  status: "candidate",
+                }),
+              },
+            }
+          : {}),
       },
     });
     return {
