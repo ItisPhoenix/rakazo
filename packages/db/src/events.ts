@@ -857,7 +857,7 @@ async function delegatedReplyGate(
     blocks: Array.isArray(row.blocks) ? (row.blocks as MessageBlock[]) : [],
   }));
   if (!consolidatedDelegationReady(sent, returned, source.id)) return { suppress: true };
-  return { suppress: false, clientNonce: `charlie:delegation:final:${originalSend.runId}` };
+  return { suppress: false, clientNonce: `delegation:final:${originalSend.runId}` };
 }
 
 // The thread lock is shared with snapshot reads that may hold it for up to 15s. Prisma's 5s
@@ -968,7 +968,7 @@ async function finalizeRunOnce(
       replyBlocks = [
         {
           kind: "text",
-          text: "Delegated work finished, but Charlie did not produce a consolidated answer. Review the specialist results and retry.",
+          text: "Delegated work finished, but the coordinator did not produce a consolidated answer. Review the specialist results and retry.",
         },
       ];
     }
