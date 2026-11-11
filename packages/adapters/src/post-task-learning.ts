@@ -119,7 +119,10 @@ async function recentSkillEvidence(prisma: PrismaClient, spaceId: string, botId:
     stats.set(name, row);
   }
   return [...stats]
-    .map(([name, count]) => `${name}: consulted ${count.used}, in completed runs ${count.completed}, in failed runs ${count.failed}`)
+    .map(
+      ([name, count]) =>
+        `${name}: consulted ${count.used}, in completed runs ${count.completed}, in failed runs ${count.failed}`,
+    )
     .join("\n");
 }
 
