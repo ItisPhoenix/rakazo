@@ -57,9 +57,9 @@ describe("Unicode boundaries", () => {
     expect(lines[2]).toBe("- C (id: c)");
     expect(lines[3]).toBe("- D (id: d): z");
     const a3999 = "a".repeat(3999);
-    expect(
-      formatBotRosterLines([{ id: "a", name: "A", description: `${a3999}${emoji}` }])[0],
-    ).toBe(`- A (id: a): ${a3999}`);
+    expect(formatBotRosterLines([{ id: "a", name: "A", description: `${a3999}${emoji}` }])[0]).toBe(
+      `- A (id: a): ${a3999}`,
+    );
   });
 });
 
