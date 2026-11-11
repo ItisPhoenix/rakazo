@@ -144,14 +144,34 @@ describe("addressing", () => {
     expect(resolveBotAddress(bots, { name: "  analyst " })?.id).toBe("b_2");
   });
 
-  it("refuses an ambiguous name rather than guessing", () => {
+  it("rejects ambiguous names regardless of exact casing or candidate order", () => {
     const twins = [
       { id: "b_1", name: "Ana" },
       { id: "b_2", name: "ana" },
     ];
-    expect(resolveBotAddress(twins, { name: "ANA" })).toBeUndefined();
-    // An exact match still wins over the ambiguity.
-    expect(resolveBotAddress(twins, { name: "ana" })?.id).toBe("b_2");
+    for (const candidates of [twins, [...twins].reverse()]) {
+      expect(resolveBotAddress(candidates, { name: "ANA" })).toBeUndefined();
+      expect(resolveBotAddress(candidates, { name: "ana" })).toBeUndefined();
+      expect(resolveBotAddress(candidates, { name: "Ana" })).toBeUndefined();
+    }
+    expect(resolveBotAddress(twins, { botId: "b_2" })?.id).toBe("b_2");
+    expect(resolveBotAddress(twins, { botId: "b_2", name: "ana" })?.id).toBe("b_2");
+  });
+
+  it("refuses duplicate exact names unless an id disambiguates them", () => {
+    const twins = [
+      { id: "b_1", name: "Gary" },
+      { id: "b_2", name: "Gary" },
+    ];
+    expect(resolveBotAddress(twins, { name: "Gary" })).toBeUndefined();
+    expect(resolveBotAddress([...twins].reverse(), { name: "Gary" })).toBeUndefined();
+    expect(resolveBotAddress(twins, { botId: "b_2", name: "Gary" })?.id).toBe("b_2");
+  });
+
+  it("refuses a conflicting bot id and name instead of messaging the wrong specialist", () => {
+    expect(resolveBotAddress(bots, { botId: "b_1", name: "Analyst" })).toBeUndefined();
+    expect(resolveBotAddress(bots, { botId: "b_2", name: "Researcher" })).toBeUndefined();
+    expect(resolveBotAddress(bots, { botId: "b_2", name: "analyst" })?.id).toBe("b_2");
   });
 
   it("returns nothing for an unknown target", () => {

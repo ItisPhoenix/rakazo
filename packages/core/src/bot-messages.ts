@@ -61,17 +61,19 @@ export function botMessageAllowsSilence(
   return intent === "status" || intent === "result" || (intent === "fyi" && !repliesToRequest);
 }
 
-/** Resolve a target by id first, then by exact name, then case-insensitively. */
+/** Resolve a unique name or an explicit id; never guess among duplicate names. */
 export function resolveBotAddress<T extends BotAddress>(
   bots: readonly T[],
   input: { botId?: string; name?: string },
 ): T | undefined {
   const botId = input.botId?.trim();
-  if (botId) return bots.find((bot) => bot.id === botId);
   const name = input.name?.trim();
+  if (botId) {
+    const target = bots.find((bot) => bot.id === botId);
+    if (!target || (name && target.name.toLowerCase() !== name.toLowerCase())) return undefined;
+    return target;
+  }
   if (!name) return undefined;
-  const exact = bots.find((bot) => bot.name === name);
-  if (exact) return exact;
   const lower = name.toLowerCase();
   const matches = bots.filter((bot) => bot.name.toLowerCase() === lower);
   return matches.length === 1 ? matches[0] : undefined;

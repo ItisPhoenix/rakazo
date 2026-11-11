@@ -248,6 +248,41 @@ describe("messaging another bot", () => {
     expect(harness.tx.run.create).not.toHaveBeenCalled();
   });
 
+  it("refuses ambiguous specialist names before any delivery or work is queued", async () => {
+    const harness = deps({
+      bots: [
+        { id: "bot-target", name: "Gary", thread: { id: "thread-target" } },
+        { id: "bot-other", name: "Gary", thread: { id: "thread-other" } },
+      ],
+    });
+    const sent = await messageBot(harness.deps, run, sender, {
+      confirm_name: "Gary",
+      message: "Inspect the repository",
+    });
+    expect(sent).toEqual({ ok: false, error: "no bot found with that id or name" });
+    expect(harness.tx.run.create).not.toHaveBeenCalled();
+    expect(harness.tx.message.create).not.toHaveBeenCalled();
+    expect(harness.enqueue).not.toHaveBeenCalled();
+  });
+
+  it("rejects conflicting specialist id and name before delivery", async () => {
+    const harness = deps({
+      bots: [
+        { id: "bot-target", name: "Gordon", thread: { id: "thread-target" } },
+        { id: "bot-other", name: "Gary", thread: { id: "thread-other" } },
+      ],
+    });
+    const sent = await messageBot(harness.deps, run, sender, {
+      bot_id: "bot-target",
+      confirm_name: "Gary",
+      message: "Inspect the repository",
+    });
+    expect(sent).toEqual({ ok: false, error: "no bot found with that id or name" });
+    expect(harness.tx.run.create).not.toHaveBeenCalled();
+    expect(harness.tx.message.create).not.toHaveBeenCalled();
+    expect(harness.enqueue).not.toHaveBeenCalled();
+  });
+
   it("refuses an empty message", async () => {
     const harness = deps();
     const sent = await messageBot(harness.deps, run, sender, {
