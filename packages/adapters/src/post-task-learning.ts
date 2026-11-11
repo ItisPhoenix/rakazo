@@ -48,7 +48,6 @@ export function postTaskReviewEligible(input: {
     !isPostTaskReview(input.run) &&
     input.run.trigger !== "reaction" &&
     input.run.trigger !== "created" &&
-    input.run.trigger !== "bot_message" &&
     input.didUsefulWork &&
     !input.handedOff &&
     input.resultText.trim().length > 0
