@@ -28,9 +28,9 @@ import {
   updateScratchpadItemFromTool,
 } from "./scratchpad-tools.js";
 import {
+  listAgentSkillRecords,
   skillCreateFromTool,
   skillDeleteFromTool,
-  listAgentSkillRecords,
   skillReadFromTool,
   skillUpdateFromTool,
 } from "./skill-tools.js";
