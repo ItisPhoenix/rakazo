@@ -224,10 +224,7 @@ export function filterStrategicInitiativeTools<
     readOnly?: boolean;
     route?: { toolName?: string; resourceId?: string };
   },
->(
-  tools: readonly T[],
-  input: { trigger: string; clientNonce: string | null | undefined },
-): T[] {
+>(tools: readonly T[], input: { trigger: string; clientNonce: string | null | undefined }): T[] {
   if (!isStrategicInitiativeRun(input)) return [...tools];
   return tools.filter((tool) => {
     // Catalog metadata is read-only. Execution routes are offered but checked
