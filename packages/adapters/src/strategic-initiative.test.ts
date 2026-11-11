@@ -479,7 +479,7 @@ it.each([
   "shell",
   "browser_act",
   "computer_act",
-  "load_skill",
+  "skill_read",
   "web_search",
   "run_subagent",
   "scratchpad_complete",
@@ -500,6 +500,7 @@ it.each([
   "send_email",
   "request_purchase",
   "catalog_execute",
+  "load_skill",
 ])("keeps %s outside the autonomous tool boundary", (name) => {
   expect(
     strategicInitiativeToolAllowed(name, {
