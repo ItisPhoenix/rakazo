@@ -6,6 +6,7 @@ import { isUniqueViolation } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 import type { MessageBlock } from "@rakazo/contracts";
 import { messageBlocksText } from "./run-replies.js";
+import { listAgentSkillRecords } from "./skill-tools.js";
 
 /**
  * An internal post-task review is an ordinary durable run, not a second
@@ -114,6 +115,9 @@ async function recentSkillEvidence(prisma: PrismaClient, spaceId: string, userId
     select: { id: true, status: true, trigger: true, clientNonce: true },
   });
   const byId = new Map(runs.map((run) => [run.id, run] as const));
+  // Resolve opaque IDs from the current user's accessible catalog only.
+  const skills = await listAgentSkillRecords(prisma, { spaceId, userId });
+  const namesById = new Map(skills.map((skill) => [skill.id, skill.name] as const));
   const stats = new Map<string, { used: number; completed: number; failed: number }>();
   for (const event of events) {
     if (!event.runId) continue;
@@ -121,7 +125,8 @@ async function recentSkillEvidence(prisma: PrismaClient, spaceId: string, userId
     if (!run || isPostTaskReview(run)) continue;
     const data = event.payload;
     if (!data || typeof data !== "object" || Array.isArray(data)) continue;
-    const name = "name" in data && typeof data.name === "string" ? data.name : "";
+    const skillId = "skillId" in data && typeof data.skillId === "string" ? data.skillId : "";
+    const name = namesById.get(skillId);
     if (!name) continue;
     const row = stats.get(name) ?? { used: 0, completed: 0, failed: 0 };
     row.used += 1;
