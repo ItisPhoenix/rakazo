@@ -183,8 +183,11 @@ export async function gateToolCall(
       : ctx.tools.connector.get(toolName)?.readOnly;
   // Discovery is not an authorization bypass. Recheck resolved actions at dispatch,
   // including catalog-loaded and batch connector tools, before an effect is claimed.
+  // Catalog search/load do not execute a remote action; the resolved execute target does.
+  const safeCatalogMetadata = catalogControlRead && declaredReadOnly === true;
   if (
     isStrategicInitiativeRun(run) &&
+    !safeCatalogMetadata &&
     (unidentifiedAction ||
       !strategicInitiativeToolAllowed(name, run, declaredReadOnly) ||
       approvalToolNames.some(
