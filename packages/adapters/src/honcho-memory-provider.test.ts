@@ -212,7 +212,12 @@ describe("HonchoMemoryProvider", () => {
     const fetch = honchoFetch();
     const memory = provider(fetch, { recallStrategy: "conclusions" });
     await memory.save(
-      { content: "Prefers short answers", scope: "isolated", botId: "bot-1", source: { kind: "durable" } },
+      {
+        content: "Prefers short answers",
+        scope: "isolated",
+        botId: "bot-1",
+        source: { kind: "durable" },
+      },
       context,
     );
     const result = await memory.recall(
