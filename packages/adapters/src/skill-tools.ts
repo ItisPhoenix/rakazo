@@ -1,5 +1,6 @@
 import type { SkillRecord, SkillSource } from "@rakazo/core";
 import {
+  archiveSkillContent,
   buildSkillMd,
   findSkillByName,
   isSkillReadOnly,
@@ -285,16 +286,33 @@ export async function skillUpdateFromTool(
   }
 
   try {
-    // Re-scope mutate to owner + user source so a stale id cannot cross tenants.
-    const updated = await prisma.agentSkill.updateMany({
+    // Keep the previous working version and refuse races, rather than overwriting
+    // changes made by another member while the model was planning this edit.
+    const current = await prisma.agentSkill.findFirst({
       where: { id: existing.id, ...onlyInSpace(owner), source: "user" },
+      select: { content: true, files: true, updatedAt: true },
+    });
+    if (!current) return { error: SHARED_SKILL_ERROR };
+    if (current.content !== existing.content) {
+      return { error: "Skill changed while this edit was prepared. Read it again before retrying." };
+    }
+    const updated = await prisma.agentSkill.updateMany({
+      where: {
+        id: existing.id,
+        ...onlyInSpace(owner),
+        source: "user",
+        updatedAt: current.updatedAt,
+      },
       data: {
         name: nextName,
         description: nextDescription,
         content: nextContent,
+        files: archiveSkillContent(current.files, current.content),
       },
     });
-    if (updated.count !== 1) return { error: SHARED_SKILL_ERROR };
+    if (updated.count !== 1) {
+      return { error: "Skill changed during this edit. Read it again before retrying." };
+    }
     return { ok: true, id: existing.id, name: nextName, description: nextDescription };
   } catch {
     return { error: "Could not update skill." };
