@@ -17,7 +17,12 @@ export type WristConnectionStatus =
   | "disconnected"
   | "error";
 
-export type WristDevice = { name: string; address: string };
+export type WristDevice = {
+  name: string;
+  address: string; // local-only device selection; never displayed or uploaded
+  rssi: number;
+  likelyWatch: boolean;
+};
 export type WristState = { status: WristConnectionStatus; reason?: string };
 export type WristEvent =
   | { type: "battery"; percent: number }
