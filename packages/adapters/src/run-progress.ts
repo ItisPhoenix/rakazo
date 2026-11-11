@@ -87,9 +87,7 @@ export async function createReplyState(
       blocks.some(
         (block) =>
           block.kind === "bot_message_sent" &&
-          (block.intent === undefined ||
-            block.intent === "request" ||
-            block.intent === "question"),
+          (block.intent === undefined || block.intent === "request" || block.intent === "question"),
       )
     ) {
       reply.delegatedRequestSent = true;
