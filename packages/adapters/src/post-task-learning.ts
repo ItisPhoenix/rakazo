@@ -100,9 +100,9 @@ export function postTaskReviewPrompt(input: {
 }
 
 /** Observed use and outcomes are signals for curation, not automatic quality scores. */
-async function recentSkillEvidence(prisma: PrismaClient, spaceId: string, botId: string) {
+async function recentSkillEvidence(prisma: PrismaClient, spaceId: string, userId: string) {
   const events = await prisma.event.findMany({
-    where: { spaceId, botId, type: "skill.consulted" },
+    where: { spaceId, type: "skill.consulted" },
     orderBy: { createdAt: "desc" },
     take: 60,
     select: { runId: true, payload: true },
@@ -110,7 +110,7 @@ async function recentSkillEvidence(prisma: PrismaClient, spaceId: string, botId:
   const ids = [...new Set(events.flatMap((event) => (event.runId ? [event.runId] : [])))];
   if (ids.length === 0) return "";
   const runs = await prisma.run.findMany({
-    where: { spaceId, id: { in: ids } },
+    where: { spaceId, userId, id: { in: ids } },
     select: { id: true, status: true, trigger: true, clientNonce: true },
   });
   const byId = new Map(runs.map((run) => [run.id, run] as const));
@@ -158,7 +158,7 @@ export async function queuePostTaskReview(
   const { run } = input;
   // Observational evidence is best-effort; a failure must not invalidate the
   // original completed task or prevent a learning attempt.
-  const history = await recentSkillEvidence(deps.prisma, run.spaceId, run.botId).catch(
+  const history = await recentSkillEvidence(deps.prisma, run.spaceId, run.userId).catch(
     (error) => {
       getLogger().error("post-task evidence lookup", error);
       return "";
