@@ -84,6 +84,8 @@ export interface ReplyState {
    * still knows progress was already published (skip hollow finals; status outcome).
    */
   publishedMidTurnUserMessage: boolean;
+  /** A request was actually sent to another bot; hold progress for one consolidated answer. */
+  delegatedRequestSent?: boolean;
   /**
    * Some runs hold back pre-tool narration instead of posting it as chat.
    * Keep the last segment in case the model supplies no final reply.
