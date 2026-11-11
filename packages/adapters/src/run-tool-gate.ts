@@ -188,8 +188,7 @@ export async function gateToolCall(
     (unidentifiedAction ||
       !strategicInitiativeToolAllowed(name, run, declaredReadOnly) ||
       approvalToolNames.some(
-        (toolName) =>
-          !strategicInitiativeToolAllowed(toolName, run, declaredReadOnlyFor(toolName)),
+        (toolName) => !strategicInitiativeToolAllowed(toolName, run, declaredReadOnlyFor(toolName)),
       ))
   ) {
     return {
