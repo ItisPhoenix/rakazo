@@ -778,7 +778,7 @@ async function delegatedReplyGate(
     where: { id: input.runId },
     select: { trigger: true, sourceMessageId: true },
   });
-  if (!current) return null;
+  if (!current?.trigger) return null;
 
   if (current.trigger !== "bot_message") {
     const ownMessages = await tx.message.findMany({
@@ -991,7 +991,10 @@ async function finalizeRunOnce(
         botId: input.botId,
         runId: input.runId,
         ...(input.outcome === "completed"
-          ? { markUnread: input.markUnread, ...(gate?.clientNonce ? { clientNonce: gate.clientNonce } : {}) }
+          ? {
+              markUnread: input.markUnread,
+              ...(gate?.clientNonce ? { clientNonce: gate.clientNonce } : {}),
+            }
           : { clientNonce: partialReplyClientNonce(input.runId) }),
       });
       const response = await appendEventInTransaction(tx, {
