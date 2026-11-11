@@ -27,6 +27,9 @@ export type WristEvent =
 type Subscription = { remove(): void };
 
 type NativeWrist = NativeModule & {
+  addListener(eventName: "onWristDevice", listener: (device: WristDevice) => void): Subscription;
+  addListener(eventName: "onWristState", listener: (state: WristState) => void): Subscription;
+  addListener(eventName: "onWristEvent", listener: (event: WristEvent) => void): Subscription;
   startScan(): Promise<void>;
   stopScan(): Promise<void>;
   connect(address: string): Promise<void>;
