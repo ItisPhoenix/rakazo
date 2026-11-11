@@ -339,11 +339,7 @@ export const messagingTools: ToolHandlers = {
       },
     );
     if (!sent.ok) return call.finish({ error: sent.error });
-    if (
-      args.intent === undefined ||
-      args.intent === "request" ||
-      args.intent === "question"
-    ) {
+    if (args.intent === undefined || args.intent === "request" || args.intent === "question") {
       ctx.state.reply.delegatedRequestSent = true;
     }
     return call.finish({
