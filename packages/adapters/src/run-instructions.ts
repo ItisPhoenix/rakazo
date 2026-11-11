@@ -123,17 +123,17 @@ export function dockerComputerToolInstruction(
   offeredToolNames?: ReadonlySet<string>,
 ): string | undefined {
   if (computerKind !== "docker") return undefined;
-  const navigate = builtinOffered(disabled, "browser_navigate");
-  const act = builtinOffered(disabled, "browser_act");
-  const takeover = builtinOffered(disabled, "request_takeover");
+  const isOffered = (name: string) =>
+    builtinOffered(disabled, name) && (!offeredToolNames || offeredToolNames.has(name));
+  const navigate = isOffered("browser_navigate");
+  const act = isOffered("browser_act");
+  const takeover = isOffered("request_takeover");
   // Do not claim a tool or distribution is installed just because the provider is Docker.
   // Images, workspaces and installed packages differ across self-hosted deployments.
   const parts = [
     "The computer runs in a container. Its operating system, workspace paths, tools, privileges, and installed packages vary by deployment. Inspect the live environment before choosing commands; never assume sudo, Python, Git, a package manager, or a browser is available.",
   ];
-  const shellOffered = offeredToolNames
-    ? offeredToolNames.has("shell")
-    : builtinOffered(disabled, "shell");
+  const shellOffered = isOffered("shell");
   if (shellOffered) {
     parts.push(
       "You can use the shell. Check pwd, id, /etc/os-release (if present), and command -v for needed tools. Discover the actual home directory from the shell rather than assuming a path. Use only installation methods your permissions and the environment allow. If a tool is missing, use another available method or explain the blocker.",
