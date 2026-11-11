@@ -81,7 +81,10 @@ import { USER_COMPUTER_TOOLS, userComputerGate } from "./run-tools-user-computer
 import { connectorTrustKeys } from "./run-trust.js";
 import { watchFromTool } from "./schedule-tools.js";
 import { pagePaymentPrecheck, paysWithWallet } from "./spending-gate.js";
-import { isStrategicInitiativeRun, strategicInitiativeToolAllowed } from "./strategic-initiative.js";
+import {
+  isStrategicInitiativeRun,
+  strategicInitiativeToolAllowed,
+} from "./strategic-initiative.js";
 
 export type AppliedEffect = Awaited<ReturnType<typeof recordEffect>>;
 
@@ -196,7 +199,8 @@ export async function gateToolCall(
   ) {
     return {
       result: {
-        error: "This unattended run cannot use an unclassified or mutating tool. Ask the owner to start that action explicitly.",
+        error:
+          "This unattended run cannot use an unclassified or mutating tool. Ask the owner to start that action explicitly.",
       },
     };
   }
