@@ -1853,76 +1853,65 @@ describe("userTurnInstructions", () => {
 });
 
 describe("dockerComputerToolInstruction", () => {
-  it("documents rootless Python tool installation only for Docker images", () => {
-    expect(dockerComputerToolInstruction("docker")).toContain("uv tool install <package>");
-    expect(dockerComputerToolInstruction("docker")).toContain("without sudo");
-    expect(dockerComputerToolInstruction("docker")).toContain("`python3 -c`");
-    expect(dockerComputerToolInstruction("docker", new Set(["shell"]))).not.toContain(
-      "`python3 -c`",
-    );
-    expect(dockerComputerToolInstruction("desktop")).toBeUndefined();
-    expect(dockerComputerToolInstruction("e2b")).toBeUndefined();
+  it("does not assume Docker distributions, installed packages or home paths", () => {
+    const instruction = dockerComputerToolInstruction("docker") ?? "";
+    expect(instruction).toContain("Inspect the live environment");
+    expect(instruction).toContain("command -v");
+    expect(instruction).not.toContain("Debian bookworm");
+    expect(instruction).not.toContain("uv tool install");
+    expect(instruction).not.toContain("`python3 -c`");
+    expect(instruction).not.toContain("`pdftotext`, `pandoc`, and `openpyxl` are available");
+    expect(instruction).not.toContain("gh auth login");
   });
 
-  it("describes Docker computer limitations only when shell is offered", () => {
-    const hiddenShell = dockerComputerToolInstruction(
+  it("describes shell capabilities only when shell is actually offered", () => {
+    const hidden = dockerComputerToolInstruction(
       "docker",
       undefined,
-      new Set(["browser_navigate", "browser_snapshot"]),
-    );
-    expect(hiddenShell).not.toContain("Debian bookworm");
-    const offeredShell = dockerComputerToolInstruction(
-      "docker",
-      undefined,
-      new Set(["shell", "browser_navigate", "browser_snapshot"]),
-    );
-    expect(offeredShell).toContain("Debian bookworm");
-    expect(offeredShell).toContain("no sudo");
-    expect(offeredShell).toContain("uv");
+      new Set(["browser_snapshot"]),
+    ) ?? "";
+    expect(hidden).not.toContain("You can use the shell");
+    expect(hidden).not.toContain("Check pwd");
+    const available = dockerComputerToolInstruction("docker", undefined, new Set(["shell"])) ?? "";
+    expect(available).toContain("You can use the shell");
+    expect(available).toContain("Check pwd");
   });
 
-  it("does not change the legacy instructions when shell is disabled", () => {
-    expect(
+  it("does not claim the shell works when the user disabled it", () => {
+    const instruction =
+      dockerComputerToolInstruction("docker", new Set(["shell"])) ?? "";
+    expect(instruction).not.toContain("You can use the shell");
+    expect(instruction).toContain("Never use `--with-token`");
+  });
+
+  it("only suggests GitHub interaction when browser tools are offered", () => {
+    const noBrowser =
+      dockerComputerToolInstruction("docker", undefined, new Set(["shell"])) ?? "";
+    expect(noBrowser).not.toContain("GitHub CLI is installed");
+    expect(noBrowser).not.toContain("request_takeover");
+    const browser =
       dockerComputerToolInstruction(
         "docker",
-        new Set(["shell", "browser_navigate", "browser_act", "request_takeover"]),
-      ),
-    ).toBe(
-      "For Python CLI tools, use `uv tool install <package>`; it installs without sudo and keeps tools under this computer's persistent home. GitHub's `gh` CLI is installed. `pdftotext`, `pandoc`, and `openpyxl` are available to extract text from PDFs, documents, and spreadsheets. Never use `--with-token` or inject a token through the environment.",
-    );
+        undefined,
+        new Set(["shell", "browser_navigate", "browser_act"]),
+      ) ?? "";
+    expect(browser).toContain("If the GitHub CLI is installed");
+    expect(browser).not.toContain("request_takeover");
   });
 
-  it("documents gh CLI device-flow login without token injection", () => {
-    const instruction = dockerComputerToolInstruction("docker");
-    expect(instruction).toContain("gh auth login");
-    expect(instruction).toContain("script -qec");
-    expect(instruction).toContain("mktemp /tmp/gh-login.XXXXXX");
-    expect(instruction).toContain('echo "$LOG"');
-    expect(instruction).toContain("https://github.com/login/device");
-    expect(instruction).toContain("request_takeover");
-    expect(instruction).toContain("--with-token");
-    expect(instruction).not.toMatch(/GH_TOKEN|GITHUB_TOKEN/);
-    expect(instruction).toMatch(/authenticate `gh`/);
-    expect(instruction).toMatch(/credential under the persistent home/);
-    expect(instruction).not.toMatch(/no token ever/i);
-    expect(instruction).not.toMatch(/sign (?:this computer's |the )?(?:desktop )?browser into/i);
-  });
-
-  it("documents installed document text extractors", () => {
-    const instruction = dockerComputerToolInstruction("docker");
-    expect(instruction).toContain("`pdftotext`, `pandoc`, and `openpyxl` are available");
-    expect(instruction).toContain("PDFs, documents, and spreadsheets");
-  });
-  it("does not prescribe disabled browser or takeover tools for gh login", () => {
-    const instruction = dockerComputerToolInstruction(
+  it("respects disabled takeover and browser tools", () => {
+    const disabled = dockerComputerToolInstruction(
       "docker",
       new Set(["browser_navigate", "browser_act", "request_takeover"]),
-    );
-    expect(instruction).toContain("uv tool install <package>");
-    expect(instruction).not.toContain("browser_navigate");
-    expect(instruction).not.toContain("browser_act");
-    expect(instruction).not.toContain("request_takeover");
-    expect(instruction).toContain("--with-token");
+    ) ?? "";
+    expect(disabled).not.toContain("request_takeover");
+    expect(disabled).not.toContain("If the GitHub CLI is installed");
+    expect(disabled).toContain("Never use `--with-token`");
+  });
+
+  it("does not add Docker guidance to other computer providers", () => {
+    expect(dockerComputerToolInstruction("desktop")).toBeUndefined();
+    expect(dockerComputerToolInstruction("e2b")).toBeUndefined();
   });
 });
 
