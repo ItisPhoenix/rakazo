@@ -1,7 +1,8 @@
 mod capture;
 mod desktop;
-// The development link transport is compiled and unit tested today. It opens no
-// socket and is never instantiated, so a normal simulator run stays offline.
+// The development link transport. The simulator only uses it when
+// --dev-link-port is given, so a normal run never opens a socket. Some
+// primitives stay unused until the client side arrives.
 #[allow(dead_code)]
 mod devlink;
 mod presentation;
@@ -30,6 +31,8 @@ struct Options {
     preview: bool,
     motion: bool,
     screen: Option<Screen>,
+    dev_link_port: Option<u16>,
+    settings_file: Option<PathBuf>,
 }
 fn options(args: impl Iterator<Item = String>) -> Result<Options, String> {
     let mut result = Options {
@@ -40,6 +43,8 @@ fn options(args: impl Iterator<Item = String>) -> Result<Options, String> {
         preview: false,
         motion: false,
         screen: None,
+        dev_link_port: None,
+        settings_file: None,
     };
     let mut args = args;
     while let Some(arg) = args.next() {
@@ -54,6 +59,22 @@ fn options(args: impl Iterator<Item = String>) -> Result<Options, String> {
             "--smoke-test" => result.smoke = true,
             "--capture" => result.capture = true,
             "--capture-motion" => result.motion = true,
+            "--settings-file" => {
+                result.settings_file = Some(PathBuf::from(
+                    args.next().ok_or("--settings-file needs a path")?,
+                ))
+            }
+            "--dev-link-port" => {
+                let port = args
+                    .next()
+                    .ok_or("--dev-link-port needs a port number")?
+                    .parse::<u16>()
+                    .map_err(|_| "--dev-link-port must be a port number between 1 and 65535")?;
+                if port == 0 {
+                    return Err("--dev-link-port must be between 1 and 65535".into());
+                }
+                result.dev_link_port = Some(port);
+            }
             "--screen" => {
                 result.screen = Some(
                     screen_from_name(&args.next().ok_or("--screen needs a screen name")?)
@@ -72,7 +93,7 @@ fn options(args: impl Iterator<Item = String>) -> Result<Options, String> {
             }
             _ => {
                 return Err(format!(
-                    "Unknown argument: {arg}. Usage: watchos-simulator [--size 240..800] [--face hybrid|minimal|classic|dashboard] [--capture | --smoke-test] [--design-preview]"
+                    "Unknown argument: {arg}. Usage: watchos-simulator [--size 240..800] [--face hybrid|minimal|classic|dashboard] [--capture | --smoke-test] [--design-preview] [--settings-file PATH] [--dev-link-port PORT]"
                 ));
             }
         }
@@ -87,6 +108,9 @@ fn options(args: impl Iterator<Item = String>) -> Result<Options, String> {
     }
     if u8::from(result.smoke) + u8::from(result.capture) + u8::from(result.motion) > 1 {
         return Err("Choose --capture, --capture-motion or --smoke-test".into());
+    }
+    if result.dev_link_port.is_some() && (result.capture || result.motion || result.preview) {
+        return Err("--dev-link-port cannot be combined with --capture, --capture-motion or --design-preview".into());
     }
     Ok(result)
 }
@@ -238,6 +262,30 @@ fn start_clock(weak: slint::Weak<WatchWindow>, state: Rc<RefCell<State>>) {
     );
 }
 
+fn start_link_poll(
+    weak: slint::Weak<WatchWindow>,
+    state: Rc<RefCell<State>>,
+    link: Option<Rc<devlink::server::DevLink>>,
+    storage: Rc<FileStorage>,
+) {
+    slint::Timer::single_shot(Duration::from_millis(50), move || {
+        if let Some(link) = &link {
+            // Requests arrive on a socket thread and are applied here, on the
+            // thread that owns the watch state and the settings file.
+            let answered = {
+                let mut state = state.borrow_mut();
+                link.pump(&mut state, storage.as_ref())
+            };
+            if answered > 0
+                && let Some(ui) = weak.upgrade()
+            {
+                sync(&ui, &state.borrow());
+            }
+        }
+        start_link_poll(weak, state, link, storage);
+    });
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let options = options(std::env::args().skip(1)).map_err(std::io::Error::other)?;
     slint::BackendSelector::new()
@@ -250,11 +298,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         || options.motion
         || options.preview
         || options.screen.is_some();
-    let storage = Rc::new(FileStorage(root.join(if isolated {
-        "target/phase2-check/settings.json"
-    } else {
-        "local-data/settings.json"
-    })));
+    let storage = Rc::new(FileStorage(match options.settings_file.clone() {
+        Some(path) => path,
+        None => root.join(if isolated {
+            "target/phase2-check/settings.json"
+        } else {
+            "local-data/settings.json"
+        }),
+    }));
     let (settings, warning) = if options.capture || options.motion {
         (Settings::default(), String::new())
     } else {
@@ -316,10 +367,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     })
     .set_brightness(settings.brightness)
     .map_err(|e| format!("Display error: {e:?}"))?;
+    // The development link is opt in. Without --dev-link-port the simulator
+    // never opens a socket and stays exactly as it was.
+    let link = match options.dev_link_port {
+        Some(port) => {
+            let token =
+                devlink::server::session_token_from_environment().map_err(std::io::Error::other)?;
+            let link = Rc::new(
+                devlink::server::DevLink::start(port, token).map_err(std::io::Error::other)?,
+            );
+            link.seed(&devlink::server::customization_of(&state.borrow().settings));
+            eprintln!(
+                "dev link: listening on 127.0.0.1:{} for a local development client",
+                link.port()
+            );
+            Some(link)
+        }
+        None => None,
+    };
     {
         let weak = ui.as_weak();
         let state = state.clone();
         let storage = storage.clone();
+        let link = link.clone();
         ui.on_action(move |action| {
             let Some(ui) = weak.upgrade() else {
                 return;
@@ -331,6 +401,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 } else {
                     "Last save failed. Check local-data permissions before applying changes.".into()
                 });
+                // A committed change is published to the development link. A
+                // cancelled draft changes nothing, so the revision stays.
+                if saved && let Some(link) = &link {
+                    link.publish(&devlink::server::customization_of(&state.settings));
+                }
             }
             sync(&ui, &state);
         });
@@ -349,6 +424,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
     start_clock(ui.as_weak(), state.clone());
+    if link.is_some() {
+        start_link_poll(ui.as_weak(), state.clone(), link.clone(), storage.clone());
+    }
     {
         let weak = ui.as_weak();
         let state = state.clone();
@@ -516,6 +594,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
     ui.run()?;
+    if let Some(link) = &link {
+        link.shutdown();
+    }
     if capture_failed.get() {
         return Err("Native capture failed".into());
     }

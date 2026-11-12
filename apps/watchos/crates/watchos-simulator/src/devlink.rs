@@ -27,21 +27,28 @@
 //! `docs/PROTOCOL.md` requires of an adapter.
 //!
 //! A link message is a JSON object with a `link` version, a `kind`, optional
-//! correlation ids, an optional session token and an optional protocol
-//! [`Envelope`]:
+//! correlation ids, an optional revision, an optional session token and an
+//! optional protocol [`Envelope`]:
 //!
 //! ```json
 //! {"link":1,"kind":"handshake","request_id":1,"token":"…"}
-//! {"link":1,"kind":"message","request_id":7,"envelope":{"version":3,"id":7,"message":{…}}}
-//! {"link":1,"kind":"ack","request_id":8,"reply_to":7,"envelope":{"version":3,"id":7,"message":{…}}}
-//! {"link":1,"kind":"error","request_id":9,"reply_to":7,"code":"conflict"}
+//! {"link":1,"kind":"message","request_id":7,"revision":4,"envelope":{"version":3,"id":7,"message":{…}}}
+//! {"link":1,"kind":"ack","request_id":8,"reply_to":7,"revision":5,"envelope":{"version":3,"id":8,"message":{…}}}
+//! {"link":1,"kind":"error","request_id":9,"reply_to":7,"code":"conflict","revision":5,"envelope":{…}}
 //! ```
+//!
+//! The revision belongs to the link layer. It records which committed state a
+//! request was based on, so a stale request can be refused instead of
+//! silently overwriting a newer change. Keeping it here leaves the protocol
+//! envelope exactly as `watchos_protocol` defines it.
 //!
 //! # Scope
 //!
 //! This module opens no sockets, starts no threads and touches no application
 //! state. It is compiled and unit tested today; a later step wires it into the
 //! simulator runtime. Nothing here may be reached in a normal simulator run.
+
+pub mod server;
 
 use std::collections::VecDeque;
 use std::fmt;
@@ -200,6 +207,14 @@ pub enum LinkCode {
     Timeout,
     /// The requested resource does not exist.
     NotFound,
+    /// The request did not state which revision it was based on.
+    RevisionRequired,
+    /// The watch has an open customization draft, so the request was refused.
+    DraftActive,
+    /// The requested change was not acceptable.
+    Invalid,
+    /// The change could not be written to the settings file.
+    StorageFailed,
     /// An unexpected server-side failure.
     Internal,
 }
@@ -227,7 +242,13 @@ pub struct LinkMessage {
     /// Failure reason. Only ever present on an error.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub code: Option<LinkCode>,
-    /// Protocol v3 envelope. Present on messages, optionally on acknowledgements.
+    /// Revision of the committed state this message is based on, or the
+    /// revision it reports. Revisions live in the link layer so the protocol
+    /// envelope stays exactly as `watchos_protocol` defines it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub revision: Option<u64>,
+    /// Protocol v3 envelope. Present on messages, optionally on acknowledgements
+    /// and on errors that report the authoritative state.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub envelope: Option<Envelope>,
 }
@@ -242,6 +263,7 @@ impl fmt::Debug for LinkMessage {
             .field("reply_to", &self.reply_to)
             .field("token", &self.token.as_ref().map(|_| "<redacted>"))
             .field("code", &self.code)
+            .field("revision", &self.revision)
             .field(
                 "envelope",
                 &self
@@ -263,6 +285,7 @@ impl LinkMessage {
             reply_to: None,
             token: Some(token.into()),
             code: None,
+            revision: None,
             envelope: None,
         }
     }
@@ -276,6 +299,7 @@ impl LinkMessage {
             reply_to: None,
             token: None,
             code: None,
+            revision: None,
             envelope: None,
         }
     }
@@ -289,6 +313,7 @@ impl LinkMessage {
             reply_to: None,
             token: None,
             code: None,
+            revision: None,
             envelope: Some(envelope),
         }
     }
@@ -302,6 +327,7 @@ impl LinkMessage {
             reply_to: Some(reply_to),
             token: None,
             code: None,
+            revision: None,
             envelope,
         }
     }
@@ -315,6 +341,7 @@ impl LinkMessage {
             reply_to,
             token: None,
             code: Some(code),
+            revision: None,
             envelope: None,
         }
     }
@@ -328,8 +355,21 @@ impl LinkMessage {
             reply_to: None,
             token: None,
             code: None,
+            revision: None,
             envelope: None,
         }
+    }
+
+    /// State the revision this message is based on, or reports.
+    pub fn with_revision(mut self, revision: u64) -> Self {
+        self.revision = Some(revision);
+        self
+    }
+
+    /// Attach the authoritative protocol state.
+    pub fn with_envelope(mut self, envelope: Envelope) -> Self {
+        self.envelope = Some(envelope);
+        self
     }
 
     /// Check the message against the link rules.
@@ -352,7 +392,11 @@ impl LinkMessage {
                     ));
                 }
                 self.require_request_id()?;
-                if self.envelope.is_some() || self.reply_to.is_some() || self.code.is_some() {
+                if self.envelope.is_some()
+                    || self.reply_to.is_some()
+                    || self.code.is_some()
+                    || self.revision.is_some()
+                {
                     return Err(LinkError::Invalid(
                         "handshake carries unexpected fields".into(),
                     ));
@@ -360,7 +404,11 @@ impl LinkMessage {
             }
             LinkKind::Hello => {
                 self.require_request_id()?;
-                if self.token.is_some() || self.envelope.is_some() || self.code.is_some() {
+                if self.token.is_some()
+                    || self.envelope.is_some()
+                    || self.code.is_some()
+                    || self.revision.is_some()
+                {
                     return Err(LinkError::Invalid("hello carries unexpected fields".into()));
                 }
             }
@@ -401,12 +449,16 @@ impl LinkMessage {
                 if self.code.is_none() {
                     return Err(LinkError::Invalid("error without a code".into()));
                 }
-                if self.token.is_some() || self.envelope.is_some() {
+                if self.token.is_some() {
                     return Err(LinkError::Invalid("error carries unexpected fields".into()));
                 }
             }
             LinkKind::Bye => {
-                if self.token.is_some() || self.envelope.is_some() || self.code.is_some() {
+                if self.token.is_some()
+                    || self.envelope.is_some()
+                    || self.code.is_some()
+                    || self.revision.is_some()
+                {
                     return Err(LinkError::Invalid("bye carries unexpected fields".into()));
                 }
             }
@@ -540,6 +592,117 @@ pub fn write_message<W: Write>(writer: &mut W, message: &LinkMessage) -> Result<
 pub fn read_message<R: Read>(reader: &mut R) -> Result<LinkMessage, LinkError> {
     let payload = read_frame(reader)?;
     LinkMessage::from_json(&payload)
+}
+
+/// Outcome of one incremental read.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Fill {
+    /// More bytes arrived.
+    Progress,
+    /// The stream had nothing to offer.
+    Idle,
+}
+
+/// Incremental frame reader for a stream that may deliver data in pieces.
+///
+/// [`read_frame`] waits for a whole frame. `FrameReader` instead reports
+/// `Ok(None)` when the stream had nothing to offer, so a caller can poll a
+/// stream that carries a read deadline without mistaking an idle link for a
+/// closed one. A deadline that expires in the middle of a frame means the
+/// frame was truncated, and the session ends.
+pub struct FrameReader {
+    buffer: Vec<u8>,
+    expected: Option<usize>,
+}
+
+impl FrameReader {
+    /// A reader that has not seen any bytes yet.
+    pub fn new() -> Self {
+        Self {
+            buffer: Vec::new(),
+            expected: None,
+        }
+    }
+
+    /// Read the next frame, or report that the stream was idle.
+    ///
+    /// The declared length is validated before the buffer is allowed to grow,
+    /// so a hostile peer cannot make the reader allocate beyond the frame cap.
+    pub fn read_frame<R: Read>(&mut self, reader: &mut R) -> Result<Option<Vec<u8>>, LinkError> {
+        loop {
+            if self.expected.is_none() {
+                if self.buffer.len() < FRAME_PREFIX_BYTES {
+                    match self.fill(reader)? {
+                        Fill::Progress => continue,
+                        Fill::Idle => return Ok(None),
+                    }
+                }
+                let declared = u32::from_be_bytes([
+                    self.buffer[0],
+                    self.buffer[1],
+                    self.buffer[2],
+                    self.buffer[3],
+                ]) as usize;
+                if declared == 0 {
+                    return Err(LinkError::EmptyFrame);
+                }
+                if declared > MAX_PAYLOAD_BYTES {
+                    return Err(LinkError::FrameTooLarge {
+                        declared,
+                        limit: MAX_PAYLOAD_BYTES,
+                    });
+                }
+                self.expected = Some(declared);
+            }
+            let expected = self.expected.unwrap_or(0);
+            let total = FRAME_PREFIX_BYTES + expected;
+            if self.buffer.len() < total {
+                match self.fill(reader)? {
+                    Fill::Progress => continue,
+                    // A deadline inside a frame means the frame was truncated.
+                    Fill::Idle => return Err(LinkError::Closed),
+                }
+            }
+            let payload = self.buffer[FRAME_PREFIX_BYTES..total].to_vec();
+            self.buffer.drain(..total);
+            self.expected = None;
+            return Ok(Some(payload));
+        }
+    }
+
+    fn fill<R: Read>(&mut self, reader: &mut R) -> Result<Fill, LinkError> {
+        let mut chunk = [0u8; 512];
+        match reader.read(&mut chunk) {
+            Ok(0) => Err(LinkError::Closed),
+            Ok(count) => {
+                if self.buffer.len() + count > FRAME_PREFIX_BYTES + MAX_PAYLOAD_BYTES {
+                    return Err(LinkError::FrameTooLarge {
+                        declared: self.buffer.len() + count,
+                        limit: FRAME_PREFIX_BYTES + MAX_PAYLOAD_BYTES,
+                    });
+                }
+                self.buffer.extend_from_slice(&chunk[..count]);
+                Ok(Fill::Progress)
+            }
+            Err(error)
+                if error.kind() == io::ErrorKind::WouldBlock
+                    || error.kind() == io::ErrorKind::TimedOut =>
+            {
+                if self.buffer.is_empty() {
+                    Ok(Fill::Idle)
+                } else {
+                    Err(LinkError::Closed)
+                }
+            }
+            Err(error) => Err(LinkError::from(error)),
+        }
+    }
+}
+
+impl Default for FrameReader {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// Read and decode deadlines used by the transport.
