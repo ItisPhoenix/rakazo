@@ -1,5 +1,9 @@
 mod capture;
 mod desktop;
+// The development link transport is compiled and unit tested today. It opens no
+// socket and is never instantiated, so a normal simulator run stays offline.
+#[allow(dead_code)]
+mod devlink;
 mod presentation;
 use desktop::{FileStorage, PreviewDisplay};
 use presentation::sync;
