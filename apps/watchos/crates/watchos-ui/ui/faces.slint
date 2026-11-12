@@ -48,7 +48,7 @@ export component WatchFace inherits Rectangle {
     accessible-label: (root.face == 0 ? "Hybrid" : root.face == 1 ? "Minimal Digital" : root.face == 2 ? "Classic Analog" : "Information Dashboard") + ", " + root.hours + ":" + root.minutes + ", " + root.date + ". Open apps";
     accessible-action-default => { root.open-apps(); }
     TouchArea { mouse-cursor: pointer; clicked => { root.open-apps(); } }
-    if root.preview-mode: Text { x: 62px * root.s; y: 8px * root.s; width: 116px * root.s; height: 8px * root.s; text: "DESIGN PREVIEW"; font-size: 7px * root.s; color: Theme.ink; horizontal-alignment: center; }
+    // Design captures are labeled by the native shell, outside the dial.
     if root.face == 0 || root.face == 2: Rectangle {
         width: parent.width; height: parent.height;
         for i in 12: Path {
@@ -59,15 +59,15 @@ export component WatchFace inherits Rectangle {
             MoveTo { x: 120 + Math.sin(i * 30deg) * 104; y: 112 - Math.cos(i * 30deg) * 94; }
             LineTo { x: 120 + Math.sin(i * 30deg) * 99; y: 112 - Math.cos(i * 30deg) * 89; }
         }
-        Text { x: 96px * root.s; y: (root.face == 0 ? 24px : 22px) * root.s; width: 48px * root.s; height: 28px * root.s; text: "12"; font-size: Theme.numeral-size * root.s; color: Theme.ink; horizontal-alignment: center; }
-        Text { x: 22px * root.s; y: 98px * root.s; width: 26px * root.s; height: 28px * root.s; text: "9"; font-size: Theme.numeral-size * root.s; color: Theme.ink; horizontal-alignment: center; }
-        Text { x: 193px * root.s; y: 98px * root.s; width: 26px * root.s; height: 28px * root.s; text: "3"; font-size: Theme.numeral-size * root.s; color: Theme.ink; horizontal-alignment: center; }
+        Text { x: 96px * root.s; y: (root.face == 0 ? 22px : 22px) * root.s; width: 48px * root.s; height: 28px * root.s; text: "12"; font-family: Theme.display-font; font-size: Theme.numeral-size * root.s; font-weight: 500; color: Theme.ink; horizontal-alignment: center; }
+        Text { x: 17px * root.s; y: 96px * root.s; width: 26px * root.s; height: 28px * root.s; text: "9"; font-family: Theme.display-font; font-size: Theme.numeral-size * root.s; font-weight: 500; color: Theme.ink; horizontal-alignment: center; }
+        Text { x: 198px * root.s; y: 96px * root.s; width: 26px * root.s; height: 28px * root.s; text: "3"; font-family: Theme.display-font; font-size: Theme.numeral-size * root.s; font-weight: 500; color: Theme.ink; horizontal-alignment: center; }
         Text { visible: root.face == 2; x: 109px * root.s; y: (root.face == 0 ? 199px : 201px) * root.s; width: 22px * root.s; height: 14px * root.s; text: "6"; font-size: (root.face == 0 ? 12px : 11px) * root.s; color: Theme.ink; horizontal-alignment: center; }
     }
     if root.face == 0: Rectangle {
         width: parent.width; height: parent.height;
         Image { width: parent.width; height: parent.height; source: @image-url("assets/rim-primary.svg"); colorize: Theme.primary; opacity: min(1, 0.82 + root.glow / 600 + (root.reduced-motion ? 0 : 0.06 * Math.sin(root.motion-phase * 1deg))); }
-        Image { width: parent.width; height: parent.height; source: @image-url("assets/rim-secondary.svg"); colorize: Theme.secondary; opacity: min(1, 0.82 + root.glow / 600 + (root.reduced-motion ? 0 : 0.06 * Math.sin(root.motion-phase * 1deg))); }
+        Image { width: parent.width; height: parent.height; source: @image-url("assets/rim-secondary.svg"); colorize: Theme.palette == 0 ? #b52bff : Theme.secondary; opacity: min(1, 0.82 + root.glow / 600 + (root.reduced-motion ? 0 : 0.06 * Math.sin(root.motion-phase * 1deg))); }
         if !root.reduced-motion: Path {
             width: parent.width; height: parent.height; viewbox-width: 240; viewbox-height: 240;
             stroke: Theme.primary.with-alpha(0.7); stroke-width: 1.8px * root.s; stroke-line-cap: round;
@@ -83,7 +83,7 @@ export component WatchFace inherits Rectangle {
 
     if root.show-date && root.clock-valid: Rectangle {
         background: root.face == 2 ? Theme.background : transparent;
-        x: 45px * root.s; y: (root.face == 0 ? 51px : root.face == 1 ? 65px : root.face == 2 ? 157px : 33px) * root.s;
+        x: 45px * root.s; y: (root.face == 0 ? 50px : root.face == 1 ? 65px : root.face == 2 ? 157px : 33px) * root.s;
         width: 150px * root.s; height: 17px * root.s; HorizontalLayout { alignment: center; spacing: 4px * root.s;
         Text { text: root.weekday; font-family: "DM Sans"; font-size: Theme.date-size * root.s; letter-spacing: Theme.date-tracking * root.s; font-weight: 600; color: Theme.ink; vertical-alignment: center; }
         Text { text: root.day; font-family: "DM Sans"; font-size: Theme.date-size * root.s; letter-spacing: Theme.date-tracking * root.s; font-weight: 600; color: Theme.primary; vertical-alignment: center; }
@@ -91,17 +91,17 @@ export component WatchFace inherits Rectangle {
         }
     }
     if root.face != 2: DigitalReadout {
-        x: (parent.width - self.width) / 2; y: (root.face == 0 ? 113px : root.face == 1 ? 82px : 52px) * root.s;
+        x: (parent.width - self.width) / 2; y: (root.face == 0 ? 111px : root.face == 1 ? 82px : 52px) * root.s;
         width: (root.face == 1 ? 145px : 112px) * root.s; height: (root.face == 1 ? 56px : 44px) * root.s;
         background: root.face == 0 ? Theme.background : transparent; border-radius: 10px * root.s;
         hours: root.hours; minutes: root.minutes; period: root.period; font: (root.face == 1 ? Theme.digit-large : Theme.digit-size) * root.s;
     }
     if root.face == 2: Text { height: 24px * root.s; x: 50px * root.s; y: 177px * root.s; width: 140px * root.s; text: root.hours + ":" + root.minutes + " " + root.period; color: Theme.primary; font-size: 15px * root.s; horizontal-alignment: center; }
     if root.show-complications && (root.face == 0 || root.face == 1): Rectangle {
-        x: (root.face == 0 ? 46px : 45px) * root.s; y: (root.face == 0 ? 154px : 153px) * root.s; width: 150px * root.s; height: Theme.complication-height * root.s;
+        x: (root.face == 0 ? 47px : 45px) * root.s; y: (root.face == 0 ? 154px : 153px) * root.s; width: (root.face == 0 ? 148px : 150px) * root.s; height: Theme.complication-height * root.s;
         for kind[i] in root.kinds: Complication {
-            x: i * 53px * root.s; width: 44px * root.s; height: Theme.complication-height * root.s;
-            label: root.labels[i]; visible: root.slots-visible[i]; accent: root.accents[i]; style: root.styles[i]; kind: kind; value: root.values[i]; status: root.statuses[i]; scale: root.s;
+            x: i * (root.face == 0 ? 52px : 53px) * root.s; width: (root.face == 0 ? 44px : 44px) * root.s; height: Theme.complication-height * root.s;
+            reference-layout: root.face == 0; label: root.labels[i]; visible: root.slots-visible[i]; accent: root.accents[i]; style: root.styles[i]; kind: kind; value: root.values[i]; status: root.statuses[i]; scale: root.s;
             tapped => { root.open-health(kind); }
         }
     }
@@ -115,7 +115,7 @@ export component WatchFace inherits Rectangle {
         }
     }
     Text {
-        x: 65px * root.s; y: (root.face == 0 ? 213px : 215px) * root.s; width: 110px * root.s; height: 17px * root.s;
+        x: 65px * root.s; y: (root.face == 0 ? 211px : 215px) * root.s; width: 110px * root.s; height: 17px * root.s;
         text: "Charlie"; font-size: Theme.wordmark-size * root.s; font-weight: 500; letter-spacing: (root.face == 0 ? 0.35px : 0.5px) * root.s;
         color: root.connection == 3 ? Theme.primary : Theme.ink.with-alpha(0.9);
         horizontal-alignment: center;
@@ -132,22 +132,34 @@ export component WatchFace inherits Rectangle {
         width: parent.width; height: parent.height;
         Path {
             width: parent.width; height: parent.height; viewbox-width: 240; viewbox-height: 240;
-            stroke: Theme.ink; stroke-width: 6px * root.s; stroke-line-cap: round;
-            MoveTo { x: 120; y: 107; }
-            LineTo { x: 120 + Math.sin(root.hour-angle * 1deg) * (root.face == 2 ? 66 : 63); y: 107 - Math.cos(root.hour-angle * 1deg) * (root.face == 2 ? 66 : 63); }
+            stroke: Theme.ink; stroke-width: (root.face == 0 ? 7px : 6px) * root.s; stroke-line-cap: round;
+            MoveTo { x: root.face == 0 ? 121 : 120; y: root.face == 0 ? 105 : 107; }
+            LineTo { x: (root.face == 0 ? 121 : 120) + Math.sin(root.hour-angle * 1deg) * (root.face == 2 ? 66 : 56); y: (root.face == 0 ? 105 : 107) - Math.cos(root.hour-angle * 1deg) * (root.face == 2 ? 66 : 56); }
         }
         Path {
             width: parent.width; height: parent.height; viewbox-width: 240; viewbox-height: 240;
             stroke: Theme.secondary; stroke-width: 3.6px * root.s; stroke-line-cap: round;
-            MoveTo { x: 120; y: 107; }
-            LineTo { x: 120 + Math.sin(root.minute-angle * 1deg) * 90; y: 107 - Math.cos(root.minute-angle * 1deg) * 90; }
+            MoveTo { x: root.face == 0 ? 121 : 120; y: root.face == 0 ? 105 : 107; }
+            LineTo { x: (root.face == 0 ? 121 : 120) + Math.sin(root.minute-angle * 1deg) * 90; y: (root.face == 0 ? 105 : 107) - Math.cos(root.minute-angle * 1deg) * 90; }
         }
         if root.show-seconds: Path {
             width: parent.width; height: parent.height; viewbox-width: 240; viewbox-height: 240;
             stroke: Theme.primary; stroke-width: 1px * root.s;
-            MoveTo { x: 120 - Math.sin(root.second-angle * 1deg) * 13; y: 107 + Math.cos(root.second-angle * 1deg) * 13; }
-            LineTo { x: 120 + Math.sin(root.second-angle * 1deg) * 91; y: 107 - Math.cos(root.second-angle * 1deg) * 91; }
+            MoveTo { x: (root.face == 0 ? 121 : 120) - Math.sin(root.second-angle * 1deg) * 13; y: (root.face == 0 ? 105 : 107) + Math.cos(root.second-angle * 1deg) * 13; }
+            LineTo { x: (root.face == 0 ? 121 : 120) + Math.sin(root.second-angle * 1deg) * 91; y: (root.face == 0 ? 105 : 107) - Math.cos(root.second-angle * 1deg) * 91; }
         }
-        Rectangle { x: 113px * root.s; y: 100px * root.s; width: 14px * root.s; height: self.width; border-radius: self.width / 2; background: Theme.primary; Rectangle { x: 1.5px * root.s; y: self.x; width: parent.width - 3px * root.s; height: self.width; border-radius: self.width / 2; background: Theme.background; } }
+        Path {
+            width: parent.width; height: parent.height; viewbox-width: 240; viewbox-height: 240;
+            stroke: Theme.primary; stroke-width: 2.2px * root.s;
+            MoveTo { x: 121; y: 97; }
+            ArcTo { radius-x: 7; radius-y: 7; sweep: true; x: 121; y: 111; }
+        }
+        Path {
+            width: parent.width; height: parent.height; viewbox-width: 240; viewbox-height: 240;
+            stroke: root.face == 0 ? (Theme.palette == 0 ? #b52bff : Theme.secondary) : Theme.primary; stroke-width: 2.2px * root.s;
+            MoveTo { x: 121; y: 111; }
+            ArcTo { radius-x: 7; radius-y: 7; sweep: true; x: 121; y: 97; }
+        }
+        Rectangle { x: 116.5px * root.s; y: 100.5px * root.s; width: 9px * root.s; height: self.width; border-radius: self.width / 2; background: Theme.background; }
     }
 }

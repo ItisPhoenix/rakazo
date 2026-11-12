@@ -6,9 +6,9 @@ The UI bundles the official Lucide SVGs from [`lucide-icons/lucide`](https://git
 
 | Kind | Category | Lucide asset |
 | ---: | --- | --- |
-| 0 | Heart rate | `heart-pulse.svg` |
-| 1 | Steps | `footprints.svg` |
-| 2 | Battery | `battery-medium.svg` |
+| 0 | Heart rate | `heart.svg` |
+| 1 | Steps | `sport-shoe.svg` |
+| 2 | Battery | `battery.svg` |
 | 3 | Calories | `flame.svg` |
 | 4 | Distance | `route.svg` |
 | 5 | Sleep | `moon.svg` |
@@ -34,3 +34,8 @@ The UI bundles the official Lucide SVGs from [`lucide-icons/lucide`](https://git
 | Other | Help fallback | `circle-question-mark.svg` (Lucide renamed `circle-help`) |
 
 The `disabled` state uses `Theme.muted` at 45% opacity. The `selected` state uses `Theme.primary`; otherwise `ink` is used. Each kind has an accessible label, and unknown kinds are labeled Help. Only the SVG assets listed above and the license are bundled; no remote icon service, bitmap, font, or emoji is used.
+
+## Shared reference icon assets
+
+The requested [heart](https://lucide.dev/icons/heart), [sport-shoe](https://lucide.dev/icons/sport-shoe) and [battery](https://lucide.dev/icons/battery) come from official Lucide commit `c55aab36b553a7de50a0050e7042fd7b2d64664e` (2026-11-13). The shared `Icon` component supplies them across the watch face, app launcher, pickers, detail screens and settings. Remaining icons stay pinned to Lucide 1.72.0. Both sources use ISC; the notice is bundled locally.
+

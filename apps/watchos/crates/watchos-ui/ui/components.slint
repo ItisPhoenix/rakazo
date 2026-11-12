@@ -25,6 +25,7 @@ export component Caption inherits Text {
     horizontal-alignment: center; vertical-alignment: center;
 }
 export component Complication inherits Rectangle {
+    in property <bool> reference-layout: false;
     in property <int> kind;
     in property <string> value;
     in property <string> status;
@@ -35,11 +36,11 @@ export component Complication inherits Rectangle {
     callback tapped();
     background: transparent;
     border-radius: self.width / 2;
-    Rectangle { y: 2px * root.scale; width: parent.width; height: parent.height - 4px * root.scale; border-radius: self.width / 2; background: Theme.surface.with-alpha(0.55); }
+    Rectangle { y: 0px; width: parent.width; height: root.reference-layout ? parent.height - 1px * root.scale : parent.height; border-radius: self.width / 2; background: Theme.surface.with-alpha(root.reference-layout ? 0.75 : 0.55); }
     accessible-role: button;
     accessible-label: root.label + ": " + root.value + ", " + root.status;
     accessible-action-default => { root.tapped(); }
-    Icon { visible: root.style != 2; x: (parent.width - self.width) / 2; y: root.style == 1 ? (parent.height - self.height) / 2 : Theme.complication-icon-top * root.scale; width: Theme.complication-icon-size * root.scale; height: self.width; kind: root.kind; ink: Theme.accent-color(root.accent); }
+    Icon { visible: root.style != 2; x: (parent.width - self.width) / 2; y: root.style == 1 ? (parent.height - self.height) / 2 : (root.reference-layout ? 7px : Theme.complication-icon-top) * root.scale; width: Theme.complication-icon-size * root.scale; height: self.width; kind: root.kind; ink: Theme.accent-color(root.accent); }
     Text { visible: root.style != 1; y: root.style == 2 ? (parent.height - self.height) / 2 : Theme.complication-value-top * root.scale; width: parent.width; height: 19px * root.scale; text: root.value; color: Theme.ink; font-family: Theme.display-font; font-size: Theme.complication-value-size * root.scale; font-weight: 600; vertical-alignment: center; overflow: elide; horizontal-alignment: center; }
     TouchArea { y: (parent.height - max(44px * root.scale, parent.height)) / 2; width: parent.width; height: max(44px * root.scale, parent.height); mouse-cursor: pointer; clicked => { root.tapped(); } }
 }

@@ -326,9 +326,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             value: Some(value),
         };
         initial.update_telemetry(Telemetry {
-            heart_rate: reading(72),
-            steps: reading(5248),
-            battery: reading(86),
+            heart_rate: reading(59),
+            steps: reading(3406),
+            battery: reading(41),
             ..Telemetry::default()
         });
     }
@@ -577,6 +577,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     ""
                 }
             );
+            // Reference pose is confined to explicitly labeled design captures.
+            if options.preview && options.screen.is_none() {
+                ui.set_hours_text("22".into());
+                ui.set_minutes_text("18".into());
+                ui.set_period_text("".into());
+                ui.set_weekday_text("THU".into());
+                ui.set_day_text("12".into());
+                ui.set_month_text("NOV".into());
+                let angles = watchos_core::hand_angles(22, 18, 0).unwrap();
+                ui.set_hour_angle(angles.hour);
+                // The reference stages 22:18 with its minute hand just past 3.
+                ui.set_minute_angle(103.0);
+            }
             if let Err(error) = capture::save(&ui, &directory, &name, options.size) {
                 eprintln!("Capture failed: {error}");
                 failed.set(true);
