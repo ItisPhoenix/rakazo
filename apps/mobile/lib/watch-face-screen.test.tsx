@@ -115,8 +115,7 @@ vi.mock("react-native", () => {
       "aria-label": props.accessibilityLabel,
       value: props.value ?? "",
       placeholder: props.placeholder,
-      onChange: (event: { target: { value: string } }) =>
-        props.onChangeText?.(event.target.value),
+      onChange: (event: { target: { value: string } }) => props.onChangeText?.(event.target.value),
     });
   }
 
@@ -170,7 +169,9 @@ function render(node: ReactNode) {
 
 function emit(name: string, event: unknown) {
   act(() => {
-    listeners.get(name)?.forEach((listener) => listener(event));
+    listeners.get(name)?.forEach((listener) => {
+      listener(event);
+    });
   });
 }
 
@@ -179,13 +180,6 @@ function buttonWith(view: HTMLElement, label: string): HTMLButtonElement {
   const found = [...view.querySelectorAll("button")].find(
     (element) => element.textContent?.trim() === label,
   );
-  if (!found) throw new Error(`no button named ${label}`);
-  return found;
-}
-
-/** The button that carries the given name in its accessibility label. */
-function namedButton(view: HTMLElement, label: string): HTMLButtonElement {
-  const found = view.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`);
   if (!found) throw new Error(`no button named ${label}`);
   return found;
 }

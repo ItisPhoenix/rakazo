@@ -32,7 +32,6 @@ import type { Choice } from "../../lib/watch-face";
 import {
   ACCENT_CHOICES,
   buildPatch,
-  emptyEdits,
   FACE_CHOICES,
   hasEdits,
   KIND_CHOICES,
