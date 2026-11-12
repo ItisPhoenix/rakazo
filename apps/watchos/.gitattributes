@@ -1,0 +1,6 @@
+# Bundled UI assets are binary: keep them byte-identical across checkouts.
+*.ttf binary
+*.png binary
+*.jpg binary
+*.gif binary
+*.zip binary

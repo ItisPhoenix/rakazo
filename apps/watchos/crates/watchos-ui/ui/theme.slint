@@ -1,0 +1,43 @@
+export global Theme {
+    in-out property <int> palette: 0;
+    in-out property <bool> reduced-motion: false;
+    out property <color> primary: palette == 1 ? #55aaff : palette == 2 ? #62ebba : palette == 3 ? #ffad66 : palette == 4 ? #ff8bc7 : #24e4ed;
+    out property <color> secondary: palette == 1 ? #677dff : palette == 2 ? #a6ffda : palette == 3 ? #ff646c : palette == 4 ? #bc86ff : #b982fa;
+    out property <color> ink: #f1f5fc;
+    out property <color> muted: #adbbcd;
+    out property <color> background: #020508;
+    out property <color> surface: #15202e;
+    out property <color> raised: #233346;
+    out property <color> error: #ffc585;
+    out property <color> heart: #ff8ba5;
+    out property <color> battery: #83f0a4;
+    out property <string> display-font: "Outfit";
+    out property <string> body-font: "DM Sans";
+    out property <length> body-size: 13px;
+    out property <length> small-size: 11px;
+    out property <length> title-size: 17px;
+    out property <length> numeral-size: 18px;
+    out property <length> digit-size: 37px;
+    out property <length> digit-large: 48px;
+    out property <length> wordmark-size: 12px;
+    out property <length> date-size: 10px;
+    out property <length> date-tracking: 0.8px;
+    out property <length> complication-icon-size: 16px;
+    out property <length> complication-value-size: 10px;
+    out property <length> complication-icon-top: 6px;
+    out property <length> complication-value-top: 17px;
+    out property <length> complication-height: 40px;
+
+    out property <length> row-height: 44px;
+    out property <length> row-gap: 7px;
+    out property <length> page-side: 35px;
+    out property <length> page-top: 25px;
+    out property <length> page-bottom: 27px;
+    out property <length> icon-size: 20px;
+    out property <length> dial-size: 240px;
+    out property <float> line-height: 1.0;
+    public pure function accent-color(accent: int) -> color {
+        return accent == 1 ? Theme.heart : accent == 2 ? #24e4ed : accent == 3 ? Theme.battery : accent == 4 ? #ffbd77 : accent == 5 ? #bc86ff : Theme.primary;
+    }
+}
+

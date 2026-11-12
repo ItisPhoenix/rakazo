@@ -1,0 +1,270 @@
+import { ScrollView, AboutSlint } from "std-widgets.slint";
+import "fonts/Outfit.ttf";
+import "fonts/DMSans.ttf";
+import { Theme } from "theme.slint";
+export { Theme } from "theme.slint";
+import { WatchButton, Caption, Icon, Complication, MenuRow } from "components.slint";
+import { WatchFace } from "faces.slint";
+export component WatchWindow inherits Window {
+    title: "Charlie · WatchOS Simulator";
+    preferred-width: 352px; preferred-height: 436px;
+    min-width: 352px; min-height: 436px;
+    background: #0c121c; default-font-family: Theme.display-font;
+    in property <int> logical-size: 240;
+    in property <int> page: 0;
+    in property <bool> clock-valid: true;
+    in property <bool> preview-mode: false;
+    in property <string> clock-text: "--:--";
+    in property <string> hours-text: "--";
+    in property <string> minutes-text: "--";
+    in property <string> seconds-text: "--";
+    in property <string> date-text;
+    in property <string> weekday-text;
+    in property <string> day-text;
+    in property <string> month-text;
+    in property <float> motion-phase;
+    in property <string> period-text;
+    in property <float> hour-angle;
+    in property <float> minute-angle;
+    in property <float> second-angle;
+    in property <bool> clock-24: true;
+    in property <bool> quiet: false;
+    in property <bool> reduced-motion: false;
+    in property <int> brightness: 80;
+    in property <int> selected-face: 0;
+    in property <int> palette: 0;
+    in property <bool> show-date: true;
+    in property <bool> show-seconds: false;
+    in property <bool> show-complications: true;
+    in property <int> glow: 60;
+    in property <[int]> complication-kinds: [0, 1, 2];
+    in property <[string]> complication-values: ["—", "—", "—"];
+    in property <[string]> complication-statuses: ["Unavailable", "Unavailable", "Unavailable"];
+    in property <[int]> complication-accents: [1, 2, 3];
+    in property <[int]> complication-styles: [0, 0, 0];
+    in property <[bool]> complication-visibility: [true, true, true];
+    in property <[string]> complication-labels: ["Heart rate", "Steps", "Battery"];
+    in property <[int]> metric-kinds;
+    in property <[int]> health-kinds;
+    in property <[int]> utility-kinds;
+    in property <[string]> metric-labels;
+    in property <[string]> metric-values;
+    in property <[string]> metric-statuses;
+    in property <int> active-slot: 0;
+    in property <int> detail-kind: 0;
+    in property <string> detail-title;
+    in property <string> detail-value;
+    in property <string> detail-status;
+    in property <string> detail-note;
+    in property <int> connection: 0;
+    in property <bool> assistant-active: false;
+    in property <float> connection-pulse: 1;
+    in property <bool> editing: false;
+    in property <string> storage-status;
+    callback action(int);
+    callback key-action(string);
+    changed page => { keys.focus(); }
+    changed palette => { Theme.palette = root.palette; }
+    property <float> s: face.width / Theme.dial-size;
+    forward-focus: keys;
+    keys := FocusScope {
+        width: parent.width; height: parent.height;
+        key-pressed(event) => { root.key-action(event.text); reject }
+        // Simulator casing only: the opaque live dial covers every reference display pixel.
+        Image { x: face.x - face.width * 0.16; y: face.y - face.width * 0.13; width: face.width * 1.32; height: self.width; source: @image-url("../../../references/hybrid-reference.png"); image-fit: contain; }
+        Text { visible: root.page != 1; x: 24px; y: 17px; text: "Charlie"; color: Theme.ink; font-size: 17px; font-weight: 500; }
+        Text { visible: root.page != 1 || root.editing || root.preview-mode || root.storage-status != ""; x: 100px; y: 20px; width: parent.width - 124px; text: root.preview-mode ? "DESIGN PREVIEW · EXAMPLES" : root.storage-status != "" ? "Settings need attention" : root.editing ? "Unsaved preview" : "Desktop preview"; color: root.editing ? Theme.primary : Theme.muted; font-family: "DM Sans"; font-size: 11px; horizontal-alignment: right; }
+        TouchArea { x: face.x + face.width + 5px; y: face.y + face.height / 2 - 22px; width: 44px; height: 44px; accessible-role: button; accessible-label: "Simulator crown: open apps"; mouse-cursor: pointer; clicked => {root.action(2);} }
+        face := Rectangle {
+            x: (parent.width - self.width) / 2; y: 56px;
+            width: min(parent.width - 112px, parent.height - 196px); height: self.width;
+            border-radius: self.width / 2; background: Theme.background; clip: true;
+            opacity: 1;
+            if root.page == 0: VerticalLayout { padding: 50px * root.s; spacing: 12px; Text { text: "Charlie"; color: Theme.ink; font-size: 25px * root.s; horizontal-alignment: center; vertical-alignment: center; } Caption { scale: root.s; text: "Starting"; color: Theme.primary; } }
+            if root.page == 1: WatchFace {
+                width: parent.width; height: parent.height;
+                opacity: 0.5 + root.brightness / 200;
+                face: root.selected-face; weekday: root.weekday-text; day: root.day-text; month: root.month-text; motion-phase: root.motion-phase; clock-valid: root.clock-valid; preview-mode: root.preview-mode; hours: root.hours-text; minutes: root.minutes-text; period: root.period-text; date: root.date-text;
+                hour-angle: root.hour-angle; minute-angle: root.minute-angle; second-angle: root.second-angle;
+                show-date: root.show-date; show-seconds: root.show-seconds; show-complications: root.show-complications;
+                labels: root.complication-labels; accents: root.complication-accents; styles: root.complication-styles; slots-visible: root.complication-visibility; kinds: root.complication-kinds; values: root.complication-values; statuses: root.complication-statuses;
+                connection: root.connection; assistant-active: root.assistant-active; connection-pulse: root.connection-pulse;
+                glow: root.glow; reduced-motion: root.reduced-motion;
+                open-apps => { root.action(2); } open-health(kind) => { root.action(400 + kind); }
+            }
+            if root.page >= 2: VerticalLayout {
+                padding-top: Theme.page-top * root.s; padding-bottom: Theme.page-bottom * root.s; padding-left: Theme.page-side * root.s; padding-right: Theme.page-side * root.s; spacing: 8px * root.s;
+                Text { height: 23px * root.s; text: root.page == 2 ? "Apps" : root.page == 3 ? "Charlie" : root.page == 4 ? "Notifications" : root.page == 5 ? "Quick settings" : root.page == 6 ? "Connection" : root.page == 7 ? "Settings" : root.page == 8 ? "Device info" : root.page == 9 ? "Watch faces" : root.page == 10 ? "Themes" : root.page == 11 ? "Appearance" : root.page == 12 ? "Health & activity" : root.page == 13 ? "Complications" : root.page == 14 ? "Choose metric" : root.page == 15 ? root.detail-title : root.page == 16 ? "Utilities" : root.page == 17 ? "Icon library" : "Slot " + (root.active-slot + 1); color: Theme.ink; font-size: Theme.title-size * root.s; font-weight: 500; horizontal-alignment: center; }
+                ScrollView {
+                    in property <int> current-page: root.page;
+                    changed current-page => { self.content-y = 0px; }
+                    content-width: self.width;
+                    VerticalLayout {
+                        spacing: Theme.row-gap * root.s;
+                        if root.page == 2: VerticalLayout {
+                            spacing: Theme.row-gap * root.s;
+                            MenuRow { scale: root.s; kind: 24; label: "Charlie assistant"; tapped => { root.action(3); } }
+                            MenuRow { scale: root.s; kind: 14; label: "Notifications"; tapped => { root.action(4); } }
+                            MenuRow { scale: root.s; kind: 8; label: "Health & activity"; tapped => { root.action(18); } }
+                            MenuRow { scale: root.s; kind: 17; label: "Utilities"; tapped => { root.action(19); } }
+                            MenuRow { scale: root.s; kind: 22; label: "Quick settings"; tapped => { root.action(5); } }
+                            MenuRow { scale: root.s; kind: 20; label: "Settings"; tapped => { root.action(7); } }
+                            MenuRow { scale: root.s; kind: 13; label: "Connection"; tapped => { root.action(6); } }
+                        }
+                        if root.page == 3: VerticalLayout {
+                            spacing: 10px * root.s;
+                            Text { text: "Unavailable"; color: Theme.primary; font-size: 20px * root.s; horizontal-alignment: center; }
+                            Caption { scale: root.s; text: "No Charlie transport.\nConnect a real provider to chat."; height: 62px * root.s; }
+                            WatchButton { scale: root.s; label: "Connection details"; tapped => { root.action(6); } }
+                        }
+                        if root.page == 4: VerticalLayout {
+                            spacing: 10px * root.s;
+                            Text { text: "All quiet"; color: Theme.ink; font-size: 24px * root.s; horizontal-alignment: center; }
+                            Caption { scale: root.s; text: "No notifications received.\nPhone transport unavailable."; height: 80px * root.s; }
+                        }
+                        if root.page == 5: VerticalLayout {
+                            spacing: Theme.row-gap * root.s;
+                            WatchButton { scale: root.s; label: root.quiet ? "Quiet mode · On" : "Quiet mode · Off"; active: root.quiet; tapped => {root.action(11);} }
+                            WatchButton { scale: root.s; label: "Preview light · " + root.brightness + "%"; tapped => {root.action(13);} }
+                            WatchButton { scale: root.s; label: root.reduced-motion ? "Motion · Reduced" : "Motion · Standard"; active: root.reduced-motion; tapped => {root.action(12);} }
+                            WatchButton { scale: root.s; label: "Appearance"; tapped => {root.action(22);} }
+                            Caption { scale: root.s; text: "Preview light changes this window only. Quiet stores a preference."; height: 65px * root.s; }
+                        }
+                        if root.page == 6: VerticalLayout {
+                            spacing: 12px * root.s;
+                            Text { text: root.connection == 3 ? "Connected" : root.connection == 2 ? "Connecting" : root.connection == 1 ? "Disconnected" : "Unavailable"; color: Theme.primary; font-size: 19px * root.s; horizontal-alignment: center; }
+                            Caption { scale: root.s; text: "Bluetooth adapter unavailable.\nNo phone transport configured."; height: 80px * root.s; }
+                            Caption { scale: root.s; text: "No pairing or network requests."; height: 50px * root.s; }
+                        }
+                        if root.page == 7: VerticalLayout {
+                            spacing: Theme.row-gap * root.s;
+                            WatchButton { scale: root.s; label: "Watch faces"; tapped => {root.action(20);} }
+                            WatchButton { scale: root.s; label: "Themes"; tapped => {root.action(21);} }
+                            WatchButton { scale: root.s; label: "Appearance"; tapped => {root.action(22);} }
+                            WatchButton { scale: root.s; label: "Complications"; tapped => {root.action(23);} }
+                            WatchButton { scale: root.s; label: root.clock-24 ? "Clock · 24 hour" : "Clock · 12 hour"; active: root.clock-24; tapped => {root.action(10);} }
+                            WatchButton { scale: root.s; label: "Device information"; tapped => {root.action(8);} }
+                            WatchButton { scale: root.s; label: "Restore defaults…"; tapped => {root.action(24);} }
+                        }
+                        if root.page == 8: VerticalLayout {
+                            spacing: 8px * root.s;
+                            Caption { scale: root.s; text: "Charlie WatchOS · Phase 2\nWindows simulator"; color: Theme.ink; height: 44px * root.s; }
+                            Caption { scale: root.s; text: root.logical-size + " × " + root.logical-size + " logical pixels\nProtocol v3 · Slint software"; height: 44px * root.s; }
+                            Caption { scale: root.s; text: "TFT design target\nMCU / sensors unknown"; height: 44px * root.s; }
+                            Caption { scale: root.s; text: "Not flashable firmware."; height: 36px * root.s; }
+                            AboutSlint {}
+                        }
+                        if root.page == 9 || root.page == 10: VerticalLayout {
+                            spacing: Theme.row-gap * root.s;
+                            HorizontalLayout { alignment: center;
+                                WatchFace { width: 106px * root.s; height: self.width; horizontal-stretch: 0; face: root.selected-face; weekday: root.weekday-text; day: root.day-text; month: root.month-text; motion-phase: root.motion-phase; clock-valid: root.clock-valid; preview-mode: root.preview-mode; hours: root.hours-text; minutes: root.minutes-text; date: root.date-text; hour-angle: root.hour-angle; minute-angle: root.minute-angle; show-complications: root.show-complications; show-date: root.show-date; labels: root.complication-labels; accents: root.complication-accents; styles: root.complication-styles; slots-visible: root.complication-visibility; kinds: root.complication-kinds; values: root.complication-values; statuses: root.complication-statuses; glow: root.glow; open-apps => {root.action(30);} }
+                            }
+                            if root.page == 9: VerticalLayout {
+                                spacing: Theme.row-gap * root.s;
+                                WatchButton { scale: root.s; label: "Hybrid"; active: root.selected-face == 0; tapped => {root.action(100);} }
+                                WatchButton { scale: root.s; label: "Minimal Digital"; active: root.selected-face == 1; tapped => {root.action(101);} }
+                                WatchButton { scale: root.s; label: "Classic Analog"; active: root.selected-face == 2; tapped => {root.action(102);} }
+                                WatchButton { scale: root.s; label: "Dashboard"; active: root.selected-face == 3; tapped => {root.action(103);} }
+                            }
+                            if root.page == 10: VerticalLayout {
+                                spacing: Theme.row-gap * root.s;
+                                WatchButton { scale: root.s; label: "Cyan / Violet"; active: root.palette == 0; tapped => {root.action(200);} }
+                                WatchButton { scale: root.s; label: "Electric Blue"; active: root.palette == 1; tapped => {root.action(201);} }
+                                WatchButton { scale: root.s; label: "Emerald / Mint"; active: root.palette == 2; tapped => {root.action(202);} }
+                                WatchButton { scale: root.s; label: "Sunset Orange"; active: root.palette == 3; tapped => {root.action(203);} }
+                                WatchButton { scale: root.s; label: "Rose / Purple"; active: root.palette == 4; tapped => {root.action(204);} }
+                            }
+                        }
+                        if root.page == 11: VerticalLayout {
+                            spacing: Theme.row-gap * root.s;
+                            WatchButton { scale: root.s; label: root.show-date ? "Date · Visible" : "Date · Hidden"; active: root.show-date; tapped => {root.action(14);} }
+                            WatchButton { scale: root.s; label: root.show-seconds ? "Seconds hand · On" : "Seconds hand · Off"; active: root.show-seconds; tapped => {root.action(15);} }
+                            WatchButton { scale: root.s; label: root.show-complications ? "Complications · On" : "Complications · Off"; active: root.show-complications; tapped => {root.action(16);} }
+                            WatchButton { scale: root.s; label: "Glow · " + root.glow + "%"; tapped => {root.action(17);} }
+                            WatchButton { scale: root.s; label: root.clock-24 ? "Clock · 24 hour" : "Clock · 12 hour"; active: root.clock-24; tapped => {root.action(10);} }
+                            WatchButton { scale: root.s; label: root.reduced-motion ? "Motion · Reduced" : "Motion · Standard"; active: root.reduced-motion; tapped => {root.action(12);} }
+                        }
+                        if root.page == 12 || root.page == 16: VerticalLayout {
+                            spacing: Theme.row-gap * root.s;
+                            for kind in (root.page == 12 ? root.health-kinds : root.utility-kinds): MenuRow {
+                                scale: root.s; kind: kind; label: root.metric-labels[kind];
+                                detail: root.metric-statuses[kind] == "Live" || root.metric-statuses[kind] == "Example" || root.metric-statuses[kind] == "Local preference" ? root.metric-values[kind] + " · " + root.metric-statuses[kind] : root.metric-statuses[kind];
+                                disabled: root.metric-statuses[kind] == "Unavailable";
+                                tapped => {root.action(400 + kind);}
+                            }
+                        }
+                        if root.page == 13: VerticalLayout {
+                            spacing: Theme.row-gap * root.s;
+                            for kind[i] in root.complication-kinds: MenuRow {
+                                scale: root.s; kind: kind; label: "Slot " + (i + 1) + " · " + root.complication-labels[i];
+                                detail: root.complication-visibility[i] ? "Visible" : "Hidden";
+                                tapped => {root.action(40 + i);}
+                            }
+                            Caption { scale: root.s; text: "Choose a slot to change metric, accent, visibility or display style."; height: 74px * root.s; }
+                        }
+                        if root.page == 14: VerticalLayout {
+                            spacing: Theme.row-gap * root.s;
+                            for kind[i] in root.metric-kinds: MenuRow {
+                                scale: root.s; kind: kind; label: root.metric-labels[i];
+                                detail: root.metric-statuses[i];
+                                selected: root.complication-kinds[root.active-slot] == kind;
+                                disabled: root.metric-statuses[i] == "Unavailable";
+                                tapped => {root.action(300 + kind);}
+                            }
+                        }
+                        if root.page == 15: VerticalLayout {
+                            spacing: 6px * root.s;
+                            HorizontalLayout { alignment: center; Icon { kind: root.detail-kind; width: 26px * root.s; height: self.width; horizontal-stretch: 0; ink: Theme.primary; } }
+                            Text { text: root.detail-value; font-size: 26px * root.s; height: 32px * root.s; color: Theme.ink; horizontal-alignment: center; }
+                            Caption { scale: root.s; text: root.detail-status; color: Theme.primary; height: 20px * root.s; }
+                            Caption { scale: root.s; text: root.detail-note; height: 54px * root.s; vertical-alignment: top; }
+                            if root.detail-kind == 20: WatchButton {scale:root.s;label:"Open settings";tapped=>{root.action(7);}}
+                            if root.detail-kind == 22: WatchButton {scale:root.s;label:"Adjust preview light";tapped=>{root.action(13);}}
+                            if root.detail-kind == 23: WatchButton {scale:root.s;label:"Toggle quiet mode";tapped=>{root.action(11);}}
+                            if root.detail-kind == 24: WatchButton {scale:root.s;label:"Open Charlie";tapped=>{root.action(3);}}
+                            if root.detail-kind == 13: WatchButton {scale:root.s;label:"Connection details";tapped=>{root.action(6);}}
+                            if root.detail-kind == 14: WatchButton {scale:root.s;label:"Open notifications";tapped=>{root.action(4);}}
+                        }
+                        if root.page == 17: Rectangle {
+                            height: 160px * root.s;
+                            for kind[i] in root.metric-kinds: Rectangle {
+                                x: Math.mod(i, 5) * 33px * root.s; y: Math.floor(i / 5) * 31px * root.s;
+                                width: 30px * root.s; height: 30px * root.s;
+                                Icon { x: 5px * root.s; width: 20px * root.s; height: self.width; kind: kind; selected: Math.mod(i, 3) == 1; disabled: Math.mod(i, 3) == 2; }
+                                Text { y: 20px * root.s; width: parent.width; height: 11px * root.s; text: kind; font-size: 10px * root.s; color: Theme.muted; horizontal-alignment: center; }
+                            }
+                        }
+                        if root.page == 18: VerticalLayout {
+                            spacing: Theme.row-gap * root.s;
+                            HorizontalLayout { alignment: center;
+                                Complication { width: 44px * root.s; height: Theme.complication-height * root.s; horizontal-stretch: 0; scale: root.s;
+                                    kind: root.complication-kinds[root.active-slot]; label: root.complication-labels[root.active-slot];
+                                    value: root.complication-values[root.active-slot]; status: root.complication-statuses[root.active-slot];
+                                    accent: root.complication-accents[root.active-slot]; style: root.complication-styles[root.active-slot];
+                                    opacity: root.complication-visibility[root.active-slot] ? 1 : 0.35;
+                                }
+                            }
+                            WatchButton { scale: root.s; label: root.complication-labels[root.active-slot]; tapped => {root.action(46);} }
+                            WatchButton { scale: root.s; label: "Accent · " + (root.complication-accents[root.active-slot] == 0 ? "Theme" : root.complication-accents[root.active-slot] == 1 ? "Coral" : root.complication-accents[root.active-slot] == 2 ? "Cyan" : root.complication-accents[root.active-slot] == 3 ? "Mint" : root.complication-accents[root.active-slot] == 4 ? "Amber" : "Violet"); tapped => {root.action(43);} }
+                            WatchButton { scale: root.s; label: root.complication-visibility[root.active-slot] ? "Visibility · Shown" : "Visibility · Hidden"; active: root.complication-visibility[root.active-slot]; tapped => {root.action(44);} }
+                            WatchButton { scale: root.s; label: "Style · " + (root.complication-styles[root.active-slot] == 0 ? "Icon + value" : root.complication-styles[root.active-slot] == 1 ? "Icon only" : "Value only"); tapped => {root.action(45);} }
+                        }
+                        if root.storage-status != "": Caption { scale: root.s; text: root.storage-status; color: Theme.error; height: 100px * root.s; }
+                    }
+                }
+            }
+        }
+        HorizontalLayout {
+            x: 20px; y: face.y + face.height + 27px; width: parent.width - 40px; height: 44px; spacing: 8px;
+            WatchButton { label: "Back"; tapped => {root.action(9);} }
+            WatchButton { label: "Home"; tapped => {root.action(1);} }
+            WatchButton { label: root.editing ? "Preview" : "Apps"; tapped => {root.action(root.editing ? 30 : 2);} }
+        }
+        if root.editing: HorizontalLayout {
+            x: 32px; y: face.y + face.height + 79px; width: parent.width - 64px; height: 44px; spacing: 10px;
+            WatchButton { label: "Cancel"; tapped => {root.action(32);} }
+            WatchButton { label: "Apply"; active: true; tapped => {root.action(31);} }
+        }
+        if !root.editing: Text { y: face.y + face.height + 85px; width: parent.width; text: root.logical-size + " × " + root.logical-size + "   /   SIMULATOR"; color: Theme.muted; font-family: "DM Sans"; font-size: 11px; horizontal-alignment: center; }
+    }
+}

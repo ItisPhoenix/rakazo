@@ -1,0 +1,9 @@
+[package]
+name = "watchos-platform"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+watchos-protocol.workspace = true
+watchos-core.workspace = true

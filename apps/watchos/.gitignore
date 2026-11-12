@@ -1,0 +1,12 @@
+# Rust build output and the pinned local toolchain.
+/target/
+/.tools/
+# Runtime settings (settings.json) stay on the machine and are never committed.
+/local-data/
+# Generated capture evidence: native PNG/GIF screenshots written by --capture.
+/artifacts/
+# Local build and run logs.
+*.log
+# Editor and OS noise.
+Thumbs.db
+desktop.ini

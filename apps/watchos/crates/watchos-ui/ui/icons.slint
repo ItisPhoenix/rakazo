@@ -1,0 +1,36 @@
+import { Theme } from "theme.slint";
+export component Icon inherits Image {
+    in property <int> kind: 0;
+    in property <color> ink: Theme.primary;
+    in property <bool> disabled: false;
+    in property <bool> selected: false;
+    source: kind == 0 ? @image-url("assets/icons/heart-pulse.svg")
+        : kind == 1 ? @image-url("assets/icons/footprints.svg")
+        : kind == 2 ? @image-url("assets/icons/battery-medium.svg")
+        : kind == 3 ? @image-url("assets/icons/flame.svg")
+        : kind == 4 ? @image-url("assets/icons/route.svg")
+        : kind == 5 ? @image-url("assets/icons/moon.svg")
+        : kind == 6 ? @image-url("assets/icons/droplets.svg")
+        : kind == 7 ? @image-url("assets/icons/dumbbell.svg")
+        : kind == 8 ? @image-url("assets/icons/activity.svg")
+        : kind == 9 ? @image-url("assets/icons/person-standing.svg")
+        : kind == 10 ? @image-url("assets/icons/bike.svg")
+        : kind == 11 ? @image-url("assets/icons/target.svg")
+        : kind == 12 || kind == 17 ? @image-url("assets/icons/timer.svg")
+        : kind == 13 ? @image-url("assets/icons/bluetooth.svg")
+        : kind == 14 ? @image-url("assets/icons/bell.svg")
+        : kind == 15 ? @image-url("assets/icons/cloud-sun.svg")
+        : kind == 16 ? @image-url("assets/icons/alarm-clock.svg")
+        : kind == 18 ? @image-url("assets/icons/timer-reset.svg")
+        : kind == 19 ? @image-url("assets/icons/headphones.svg")
+        : kind == 20 ? @image-url("assets/icons/settings-2.svg")
+        : kind == 21 ? @image-url("assets/icons/smartphone.svg")
+        : kind == 22 ? @image-url("assets/icons/sun.svg")
+        : kind == 23 ? @image-url("assets/icons/moon-star.svg")
+        : kind == 24 ? @image-url("assets/icons/audio-lines.svg")
+        : @image-url("assets/icons/circle-question-mark.svg");
+    colorize: root.disabled ? Theme.muted : root.selected ? Theme.primary : root.ink;
+    opacity: root.disabled ? 0.45 : 1;
+    image-fit: contain;
+    accessible-label: kind == 0 ? "Heart rate" : kind == 1 ? "Steps" : kind == 2 ? "Battery" : kind == 3 ? "Calories" : kind == 4 ? "Distance" : kind == 5 ? "Sleep" : kind == 6 ? "Blood oxygen" : kind == 7 ? "Workout" : kind == 8 ? "Running" : kind == 9 ? "Walking" : kind == 10 ? "Cycling" : kind == 11 ? "Activity goals" : kind == 12 ? "Exercise duration" : kind == 13 ? "Bluetooth" : kind == 14 ? "Notifications" : kind == 15 ? "Weather" : kind == 16 ? "Alarm" : kind == 17 ? "Timer" : kind == 18 ? "Stopwatch" : kind == 19 ? "Music" : kind == 20 ? "Settings" : kind == 21 ? "Phone finder" : kind == 22 ? "Brightness" : kind == 23 ? "Do not disturb" : kind == 24 ? "Charlie" : "Help";
+}

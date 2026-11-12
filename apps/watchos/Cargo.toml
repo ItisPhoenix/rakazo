@@ -1,0 +1,35 @@
+[workspace]
+members = ["crates/*"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.92"
+license = "GPL-3.0-only"
+
+[workspace.dependencies]
+watchos-core = { path = "crates/watchos-core" }
+watchos-protocol = { path = "crates/watchos-protocol" }
+watchos-platform = { path = "crates/watchos-platform" }
+watchos-ui = { path = "crates/watchos-ui" }
+serde = { version = "=1.0.228", default-features = false, features = ["derive"] }
+serde_json = "=1.0.145"
+slint = { version = "=1.18.1", default-features = false, features = ["std", "backend-winit", "accessibility", "renderer-software", "compat-1-2"] }
+slint-build = "=1.18.1"
+chrono = { version = "=0.4.42", default-features = false, features = ["clock"] }
+
+[profile.release]
+lto = "thin"
+strip = true
+
+
+# Keep native preview animation responsive without optimizing application debug code.
+[profile.dev.package.i-slint-renderer-software]
+opt-level = 2
+
+[profile.dev.package.tiny-skia]
+opt-level = 2
+
+[profile.dev.package.tiny-skia-path]
+opt-level = 2

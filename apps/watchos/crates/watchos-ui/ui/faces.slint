@@ -1,0 +1,153 @@
+import { Theme } from "theme.slint";
+import { Complication, Icon } from "components.slint";
+component DigitalReadout inherits Rectangle {
+    in property <string> hours;
+    in property <string> minutes;
+    in property <string> period;
+    in property <length> font: 36px;
+    Text { x: 0px; width: parent.width * 0.425; height: parent.height; text: root.hours; color: Theme.ink; font-size: root.font; font-weight: 500; horizontal-alignment: right; vertical-alignment: center; }
+    Text { x: parent.width * 0.425; width: parent.width * 0.15; height: parent.height; text: ":"; color: Theme.ink; font-size: root.font; font-weight: 500; horizontal-alignment: center; vertical-alignment: center; }
+    Text { x: parent.width * 0.575; width: parent.width * 0.425; height: parent.height; text: root.minutes; color: Theme.primary; font-size: root.font; font-weight: 500; horizontal-alignment: left; vertical-alignment: center; }
+    Text { x: parent.width + 3px; y: parent.height * 0.58; width: root.font * 0.55; height: root.font * 0.35; text: root.period; color: Theme.muted; font-size: root.font * 0.24; vertical-alignment: center; }
+}
+export component WatchFace inherits Rectangle {
+    in property <int> face: 0;
+    in property <bool> clock-valid: true;
+    in property <bool> preview-mode: false;
+    in property <string> hours: "--";
+    in property <string> minutes: "--";
+    in property <string> period;
+    in property <string> date;
+    in property <string> weekday;
+    in property <string> day;
+    in property <string> month;
+    in property <float> motion-phase;
+    in property <float> hour-angle;
+    in property <float> minute-angle;
+    in property <float> second-angle;
+    in property <bool> show-date: true;
+    in property <bool> show-seconds: false;
+    in property <bool> show-complications: true;
+    in property <[string]> labels: ["Heart rate", "Steps", "Battery"];
+    in property <[int]> accents: [1, 2, 3];
+    in property <[int]> styles: [0, 0, 0];
+    in property <[bool]> slots-visible: [true, true, true];
+    in property <[int]> kinds: [0, 1, 2];
+    in property <[string]> values: ["—", "—", "—"];
+    in property <[string]> statuses: ["Unavailable", "Unavailable", "Unavailable"];
+    in property <int> connection: 0;
+    in property <bool> assistant-active: false;
+    in property <bool> reduced-motion: false;
+    in property <float> connection-pulse: 1;
+    in property <int> glow: 60;
+    callback open-apps();
+    callback open-health(int);
+    property <float> s: self.width / Theme.dial-size;
+    border-radius: self.width / 2; background: Theme.background; clip: true;
+    accessible-role: button;
+    accessible-label: (root.face == 0 ? "Hybrid" : root.face == 1 ? "Minimal Digital" : root.face == 2 ? "Classic Analog" : "Information Dashboard") + ", " + root.hours + ":" + root.minutes + ", " + root.date + ". Open apps";
+    accessible-action-default => { root.open-apps(); }
+    TouchArea { mouse-cursor: pointer; clicked => { root.open-apps(); } }
+    if root.preview-mode: Text { x: 62px * root.s; y: 8px * root.s; width: 116px * root.s; height: 8px * root.s; text: "DESIGN PREVIEW"; font-size: 7px * root.s; color: Theme.ink; horizontal-alignment: center; }
+    if root.face == 0 || root.face == 2: Rectangle {
+        width: parent.width; height: parent.height;
+        for i in 12: Path {
+            visible: i != 6;
+            width: parent.width; height: parent.height; viewbox-width: 240; viewbox-height: 240;
+            stroke: Math.mod(i, 3) == 0 ? Theme.muted : Theme.secondary.with-alpha(0.6);
+            stroke-width: (Math.mod(i, 3) == 0 ? 1.4px : 1px) * root.s; stroke-line-cap: round;
+            MoveTo { x: 120 + Math.sin(i * 30deg) * 104; y: 112 - Math.cos(i * 30deg) * 94; }
+            LineTo { x: 120 + Math.sin(i * 30deg) * 99; y: 112 - Math.cos(i * 30deg) * 89; }
+        }
+        Text { x: 96px * root.s; y: (root.face == 0 ? 24px : 22px) * root.s; width: 48px * root.s; height: 28px * root.s; text: "12"; font-size: Theme.numeral-size * root.s; color: Theme.ink; horizontal-alignment: center; }
+        Text { x: 22px * root.s; y: 98px * root.s; width: 26px * root.s; height: 28px * root.s; text: "9"; font-size: Theme.numeral-size * root.s; color: Theme.ink; horizontal-alignment: center; }
+        Text { x: 193px * root.s; y: 98px * root.s; width: 26px * root.s; height: 28px * root.s; text: "3"; font-size: Theme.numeral-size * root.s; color: Theme.ink; horizontal-alignment: center; }
+        Text { visible: root.face == 2; x: 109px * root.s; y: (root.face == 0 ? 199px : 201px) * root.s; width: 22px * root.s; height: 14px * root.s; text: "6"; font-size: (root.face == 0 ? 12px : 11px) * root.s; color: Theme.ink; horizontal-alignment: center; }
+    }
+    if root.face == 0: Rectangle {
+        width: parent.width; height: parent.height;
+        Image { width: parent.width; height: parent.height; source: @image-url("assets/rim-primary.svg"); colorize: Theme.primary; opacity: min(1, 0.82 + root.glow / 600 + (root.reduced-motion ? 0 : 0.06 * Math.sin(root.motion-phase * 1deg))); }
+        Image { width: parent.width; height: parent.height; source: @image-url("assets/rim-secondary.svg"); colorize: Theme.secondary; opacity: min(1, 0.82 + root.glow / 600 + (root.reduced-motion ? 0 : 0.06 * Math.sin(root.motion-phase * 1deg))); }
+        if !root.reduced-motion: Path {
+            width: parent.width; height: parent.height; viewbox-width: 240; viewbox-height: 240;
+            stroke: Theme.primary.with-alpha(0.7); stroke-width: 1.8px * root.s; stroke-line-cap: round;
+            MoveTo { x: 120 + Math.sin(root.motion-phase * 1deg) * 114; y: 120 - Math.cos(root.motion-phase * 1deg) * 114; }
+            ArcTo { radius-x: 114; radius-y: 114; sweep: true; x: 120 + Math.sin((root.motion-phase + 18) * 1deg) * 114; y: 120 - Math.cos((root.motion-phase + 18) * 1deg) * 114; }
+        }
+    }
+    if root.face == 1 || root.face == 3: Path {
+        width: parent.width; height: parent.height; viewbox-width: 240; viewbox-height: 240;
+        commands: "M39 39 A114 114 0 0 1 201 39 M56 214 A114 114 0 0 0 184 214";
+        stroke: Theme.primary; stroke-width: 2px * root.s; opacity: 0.6;
+    }
+
+    if root.show-date && root.clock-valid: Rectangle {
+        background: root.face == 2 ? Theme.background : transparent;
+        x: 45px * root.s; y: (root.face == 0 ? 51px : root.face == 1 ? 65px : root.face == 2 ? 157px : 33px) * root.s;
+        width: 150px * root.s; height: 17px * root.s; HorizontalLayout { alignment: center; spacing: 4px * root.s;
+        Text { text: root.weekday; font-family: "DM Sans"; font-size: Theme.date-size * root.s; letter-spacing: Theme.date-tracking * root.s; font-weight: 600; color: Theme.ink; vertical-alignment: center; }
+        Text { text: root.day; font-family: "DM Sans"; font-size: Theme.date-size * root.s; letter-spacing: Theme.date-tracking * root.s; font-weight: 600; color: Theme.primary; vertical-alignment: center; }
+        Text { text: root.month; font-family: "DM Sans"; font-size: Theme.date-size * root.s; letter-spacing: Theme.date-tracking * root.s; font-weight: 600; color: Theme.ink; vertical-alignment: center; }
+        }
+    }
+    if root.face != 2: DigitalReadout {
+        x: (parent.width - self.width) / 2; y: (root.face == 0 ? 113px : root.face == 1 ? 82px : 52px) * root.s;
+        width: (root.face == 1 ? 145px : 112px) * root.s; height: (root.face == 1 ? 56px : 44px) * root.s;
+        background: root.face == 0 ? Theme.background : transparent; border-radius: 10px * root.s;
+        hours: root.hours; minutes: root.minutes; period: root.period; font: (root.face == 1 ? Theme.digit-large : Theme.digit-size) * root.s;
+    }
+    if root.face == 2: Text { height: 24px * root.s; x: 50px * root.s; y: 177px * root.s; width: 140px * root.s; text: root.hours + ":" + root.minutes + " " + root.period; color: Theme.primary; font-size: 15px * root.s; horizontal-alignment: center; }
+    if root.show-complications && (root.face == 0 || root.face == 1): Rectangle {
+        x: (root.face == 0 ? 46px : 45px) * root.s; y: (root.face == 0 ? 154px : 153px) * root.s; width: 150px * root.s; height: Theme.complication-height * root.s;
+        for kind[i] in root.kinds: Complication {
+            x: i * 53px * root.s; width: 44px * root.s; height: Theme.complication-height * root.s;
+            label: root.labels[i]; visible: root.slots-visible[i]; accent: root.accents[i]; style: root.styles[i]; kind: kind; value: root.values[i]; status: root.statuses[i]; scale: root.s;
+            tapped => { root.open-health(kind); }
+        }
+    }
+    if root.show-complications && root.face == 3: VerticalLayout {
+        x: 43px * root.s; y: 103px * root.s; width: 154px * root.s; height: 95px * root.s; spacing: 4px * root.s;
+        for kind[i] in root.kinds: HorizontalLayout {
+            spacing: 9px * root.s;
+            Icon { width: 17px * root.s; height: 17px * root.s; kind: kind; }
+            Text { text: root.labels[i]; color: Theme.muted; font-size: 12px * root.s; vertical-alignment: center; }
+            Text { text: root.values[i]; color: Theme.ink; font-size: 16px * root.s; horizontal-alignment: right; vertical-alignment: center; }
+        }
+    }
+    Text {
+        x: 65px * root.s; y: (root.face == 0 ? 213px : 215px) * root.s; width: 110px * root.s; height: 17px * root.s;
+        text: "Charlie"; font-size: Theme.wordmark-size * root.s; font-weight: 500; letter-spacing: (root.face == 0 ? 0.35px : 0.5px) * root.s;
+        color: root.connection == 3 ? Theme.primary : Theme.ink.with-alpha(0.9);
+        horizontal-alignment: center;
+        opacity: root.connection == 2 ? root.connection-pulse : 1;
+        animate opacity { duration: root.reduced-motion ? 0ms : 550ms; }
+    }
+    if root.connection == 3: Text {
+        x: 65px * root.s; y: (root.face == 0 ? 212px : 214px) * root.s; width: 110px * root.s; height: 19px * root.s;
+        text: "Charlie"; font-size: Theme.wordmark-size * root.s; font-weight: 500; letter-spacing: (root.face == 0 ? 0.35px : 0.5px) * root.s; color: Theme.secondary;
+        horizontal-alignment: center; opacity: (root.assistant-active ? 0.7 : 0.35) * root.glow / 100;
+    }
+    // Hands and hub are the frontmost visual layer, above all dial text.
+    if root.clock-valid && (root.face == 0 || root.face == 2): Rectangle {
+        width: parent.width; height: parent.height;
+        Path {
+            width: parent.width; height: parent.height; viewbox-width: 240; viewbox-height: 240;
+            stroke: Theme.ink; stroke-width: 6px * root.s; stroke-line-cap: round;
+            MoveTo { x: 120; y: 107; }
+            LineTo { x: 120 + Math.sin(root.hour-angle * 1deg) * (root.face == 2 ? 66 : 63); y: 107 - Math.cos(root.hour-angle * 1deg) * (root.face == 2 ? 66 : 63); }
+        }
+        Path {
+            width: parent.width; height: parent.height; viewbox-width: 240; viewbox-height: 240;
+            stroke: Theme.secondary; stroke-width: 3.6px * root.s; stroke-line-cap: round;
+            MoveTo { x: 120; y: 107; }
+            LineTo { x: 120 + Math.sin(root.minute-angle * 1deg) * 90; y: 107 - Math.cos(root.minute-angle * 1deg) * 90; }
+        }
+        if root.show-seconds: Path {
+            width: parent.width; height: parent.height; viewbox-width: 240; viewbox-height: 240;
+            stroke: Theme.primary; stroke-width: 1px * root.s;
+            MoveTo { x: 120 - Math.sin(root.second-angle * 1deg) * 13; y: 107 + Math.cos(root.second-angle * 1deg) * 13; }
+            LineTo { x: 120 + Math.sin(root.second-angle * 1deg) * 91; y: 107 - Math.cos(root.second-angle * 1deg) * 91; }
+        }
+        Rectangle { x: 113px * root.s; y: 100px * root.s; width: 14px * root.s; height: self.width; border-radius: self.width / 2; background: Theme.primary; Rectangle { x: 1.5px * root.s; y: self.x; width: parent.width - 3px * root.s; height: self.width; border-radius: self.width / 2; background: Theme.background; } }
+    }
+}

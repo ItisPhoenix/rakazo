@@ -1,0 +1,11 @@
+[package]
+name = "watchos-protocol"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { workspace = true, features = ["alloc"] }
+
+[dev-dependencies]
+serde_json.workspace = true
