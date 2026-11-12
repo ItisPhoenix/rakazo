@@ -439,4 +439,102 @@ class DevLinkClientTest {
       simulator.close()
     }
   }
+
+  @Test
+  fun `an apply reports the request id the simulator answers`() {
+    val simulator =
+      FakeSimulator { message, _ ->
+        when (message.getString("kind")) {
+          "handshake" -> stateAck(message.getLong("request_id"), 1)
+          "message" -> stateAck(message.getLong("request_id"), 2, "classic")
+          else -> null
+        }
+      }
+    val listener = RecordingListener()
+    val link = client(listener)
+    try {
+      link.connect("127.0.0.1", simulator.port, "session-value")
+      assertTrue(listener.connected.await(5, TimeUnit.SECONDS))
+      val requestId =
+        link.applyCustomization(JSONObject().put("appearance", JSONObject().put("face", "classic")).toString())
+      assertTrue("a request must carry an id", requestId > 0)
+      assertTrue(listener.answered.await(5, TimeUnit.SECONDS))
+      assertEquals(
+        "the simulator must see the id the caller was told",
+        requestId,
+        simulator.received.last().getLong("request_id"),
+      )
+      assertEquals(requestId, listener.acks.first().first)
+    } finally {
+      link.disconnect()
+      simulator.close()
+    }
+  }
+
+  @Test
+  fun `a sync reports the request id the simulator answers`() {
+    val simulator =
+      FakeSimulator { message, _ ->
+        when (message.getString("kind")) {
+          "handshake" -> stateAck(message.getLong("request_id"), 1)
+          "hello" -> stateAck(message.getLong("request_id"), 1)
+          else -> null
+        }
+      }
+    val listener = RecordingListener()
+    val link = client(listener)
+    try {
+      link.connect("127.0.0.1", simulator.port, "session-value")
+      assertTrue(listener.connected.await(5, TimeUnit.SECONDS))
+      val requestId = link.requestSync()
+      assertTrue("a request must carry an id", requestId > 0)
+      assertTrue(listener.answered.await(5, TimeUnit.SECONDS))
+      assertEquals(
+        "the simulator must see the id the caller was told",
+        requestId,
+        simulator.received.last().getLong("request_id"),
+      )
+      assertEquals(requestId, listener.acks.first().first)
+    } finally {
+      link.disconnect()
+      simulator.close()
+    }
+  }
+
+  @Test
+  fun `every request gets its own id`() {
+    val simulator =
+      FakeSimulator { message, _ ->
+        when (message.getString("kind")) {
+          "handshake" -> stateAck(message.getLong("request_id"), 1)
+          "hello" -> stateAck(message.getLong("request_id"), 1)
+          "message" -> stateAck(message.getLong("request_id"), 2, "classic")
+          else -> null
+        }
+      }
+    val listener = RecordingListener()
+    val link = client(listener)
+    try {
+      link.connect("127.0.0.1", simulator.port, "session-value")
+      assertTrue(listener.connected.await(5, TimeUnit.SECONDS))
+      val sync = link.requestSync()
+      val change =
+        link.applyCustomization(JSONObject().put("appearance", JSONObject().put("face", "classic")).toString())
+      assertTrue("two requests must not share an id", sync != change)
+      assertTrue(sync > 0)
+      assertTrue(change > 0)
+    } finally {
+      link.disconnect()
+      simulator.close()
+    }
+  }
+
+  @Test
+  fun `a refused request has no id`() {
+    val listener = RecordingListener()
+    val link = client(listener)
+    assertEquals(DevLinkClient.NO_REQUEST, link.connect("", 4599, "session-value"))
+    assertEquals(DevLinkClient.NO_REQUEST, link.connect("127.0.0.1", 0, "session-value"))
+    assertEquals(DevLinkClient.NO_REQUEST, link.connect("127.0.0.1", 4599, ""))
+  }
 }

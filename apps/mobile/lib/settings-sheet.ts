@@ -33,6 +33,7 @@ const settingsScreens = new Set([
   "vault",
   "voice",
   "wallet",
+  "watch-face",
 ]);
 
 /** Registers the open settings sheet's close action; the returned function unregisters it. */

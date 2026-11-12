@@ -83,6 +83,28 @@ watchDevLinkCustomization((event) => {
 await devLink.applyCustomization({ appearance: { face: "classic" } });
 ```
 
+`requestSync` and `applyCustomization` answer with the request id they used, so
+the answer to a change can be told apart from the answer to a sync. The
+`watchLinkState` reducer in `apps/mobile/lib/watch-link-state.ts` uses that to
+tell a remote change apart from the answer to the screen's own request.
+
+## The watch customization screen
+
+`apps/mobile/app/(settings)/watch-face.tsx` configures the simulator: the four
+watch faces, the five palettes, the three complication slots, the glow, the
+date, the seconds, the complication visibility, the 24-hour clock and the
+reduced motion.
+
+The screen keeps the state the simulator reported and, on top of it, only the
+values that were changed. A change is therefore always sent on top of the
+newest state the simulator holds, which is what makes a stale revision
+recoverable: the refused change is kept on the screen and the next attempt
+carries it on top of the newer state.
+
+The screen only exists in the Charlie Wrist Lab build. `isLabBuild` answers
+which build is running, and the entry point in the Charlie Wrist screen is
+hidden in every other build.
+
 ## Tests
 
 - `android/src/test` holds JVM tests for the framing, the merge rules and the

@@ -9,6 +9,7 @@ import {
   View,
   useColorScheme,
 } from "react-native";
+import { useRouter } from "expo-router";
 import type { WristDevice, WristEvent, WristState } from "../../lib/wrist";
 import {
   requestWristBluetoothPermissions,
@@ -18,6 +19,7 @@ import {
   wrist,
   wristAvailable,
 } from "../../lib/wrist";
+import { devLinkLabBuild } from "../../lib/devlink";
 
 const initialState: WristState = { status: "disconnected" };
 
@@ -27,6 +29,7 @@ export default function CharlieWristScreen() {
   const muted = dark ? "#AAB8BF" : "#51666E";
   const surface = dark ? "#1B252B" : "#FFFFFF";
   const background = dark ? "#0B1318" : "#F2F7F8";
+  const router = useRouter();
 
   const [devices, setDevices] = useState<WristDevice[]>([]);
   const [connection, setConnection] = useState<WristState>(initialState);
@@ -36,6 +39,8 @@ export default function CharlieWristScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const available = Platform.OS === "android" && wristAvailable();
+  // The simulator link is a development tool, so it only exists in the lab build.
+  const labBuild = Platform.OS === "android" && devLinkLabBuild();
   const ready = connection.status === "ready";
 
   useEffect(() => {
@@ -203,6 +208,26 @@ export default function CharlieWristScreen() {
               Only known event types are shown. Raw Bluetooth packets and device addresses are not uploaded.
             </Text>
           </View>
+
+          {labBuild ? (
+            <View style={[styles.card, { backgroundColor: surface }]}>
+              <Text style={[styles.section, { color: foreground }]}>4. WatchOS simulator</Text>
+              <Text style={[styles.body, { color: muted }]}>
+                Configure the Rust WatchOS simulator: watch face, palette, complications and
+                clock. The simulator keeps the settings; the physical watch is not involved.
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push("/watch-face")}
+                style={({ pressed }) => [
+                  styles.button,
+                  { opacity: pressed ? 0.75 : 1 },
+                ]}
+              >
+                <Text style={styles.buttonText}>Open the watch face screen</Text>
+              </Pressable>
+            </View>
+          ) : null}
         </>
       )}
       {busy ? <ActivityIndicator style={styles.spinner} color="#189F9C" /> : null}

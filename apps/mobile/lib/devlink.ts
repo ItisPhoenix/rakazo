@@ -135,8 +135,9 @@ type NativeDevLink = NativeModule & {
   ): Subscription;
   connect(host: string, port: number, token: string): Promise<void>;
   disconnect(): Promise<void>;
-  requestSync(): Promise<void>;
-  applyCustomization(patchJson: string): Promise<void>;
+  requestSync(): Promise<number>;
+  applyCustomization(patchJson: string): Promise<number>;
+  isLabBuild(): boolean;
   currentState(): Promise<{
     status: string;
     connected: boolean;
@@ -189,6 +190,24 @@ const STYLES: readonly DevLinkComplicationStyle[] = ["icon_value", "icon_only", 
 /** True when this build carries the development link. */
 export function devLinkAvailable(): boolean {
   return module !== null;
+}
+
+/**
+ * True when this build may talk to a development simulator.
+ *
+ * Only the Charlie Wrist Lab build may do so. The native module refuses
+ * every call in any other build; this lets the user interface say so before
+ * a button is pressed instead of after it fails.
+ */
+export function devLinkLabBuild(): boolean {
+  if (!module) return false;
+  try {
+    return module.isLabBuild() === true;
+  } catch {
+    // A native module without the check is treated as a build that may not
+    // talk to a simulator.
+    return false;
+  }
 }
 
 function oneOf<T extends string>(value: unknown, allowed: readonly T[]): T | null {
@@ -284,7 +303,12 @@ export const devLink = {
   /** Close the link and release the socket. */
   disconnect: async () => requireModule().disconnect(),
 
-  /** Ask the simulator for the committed customization. */
+  /**
+   * Ask the simulator for the committed customization.
+   *
+   * The returned id belongs to the request, so the answer can be told apart
+   * from the answer to a change.
+   */
   requestSync: async () => requireModule().requestSync(),
 
   /**
@@ -292,6 +316,9 @@ export const devLink = {
    *
    * The change is applied on top of the customization the simulator last
    * reported, so parts that are not mentioned keep their value.
+   *
+   * The returned id belongs to the request, so the answer can be told apart
+   * from the answer to a sync.
    */
   applyCustomization: async (patch: DevLinkCustomizationPatch) =>
     requireModule().applyCustomization(JSON.stringify(patch)),

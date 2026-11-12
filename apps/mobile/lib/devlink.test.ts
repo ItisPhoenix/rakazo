@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { nativeModule, listeners, availability } = vi.hoisted(() => {
+const { nativeModule, listeners, availability, labBuild } = vi.hoisted(() => {
   const listeners = new Map<string, Set<(event: unknown) => void>>();
   const availability = { available: true };
+  const labBuild = { allowed: true };
   const nativeModule = {
     addListener: vi.fn((name: string, listener: (event: unknown) => void) => {
       const set = listeners.get(name) ?? new Set<(event: unknown) => void>();
@@ -16,8 +17,9 @@ const { nativeModule, listeners, availability } = vi.hoisted(() => {
     }),
     connect: vi.fn(async () => undefined),
     disconnect: vi.fn(async () => undefined),
-    requestSync: vi.fn(async () => undefined),
-    applyCustomization: vi.fn(async (_patch: string) => undefined),
+    requestSync: vi.fn(async () => 11),
+    applyCustomization: vi.fn(async (_patch: string) => 12),
+    isLabBuild: vi.fn(() => labBuild.allowed),
     currentState: vi.fn(async () => ({
       status: "idle",
       connected: false,
@@ -25,7 +27,7 @@ const { nativeModule, listeners, availability } = vi.hoisted(() => {
       customization: "",
     })),
   };
-  return { nativeModule, listeners, availability };
+  return { nativeModule, listeners, availability, labBuild };
 });
 
 vi.mock("expo-modules-core", () => ({
@@ -60,10 +62,12 @@ describe("mobile watchos development link", () => {
   beforeEach(() => {
     listeners.clear();
     availability.available = true;
+    labBuild.allowed = true;
     nativeModule.connect.mockClear();
     nativeModule.disconnect.mockClear();
     nativeModule.requestSync.mockClear();
     nativeModule.applyCustomization.mockClear();
+    nativeModule.isLabBuild.mockClear();
     nativeModule.currentState.mockClear();
     vi.resetModules();
   });
@@ -101,6 +105,26 @@ describe("mobile watchos development link", () => {
     const sent = nativeModule.applyCustomization.mock.calls[0]?.[0];
     expect(typeof sent).toBe("string");
     expect(JSON.parse(sent as string)).toEqual({ appearance: { face: "classic" } });
+  });
+
+  it("reports the request id of a change and of a sync", async () => {
+    const { devLink } = await load();
+    await expect(devLink.applyCustomization({ appearance: { face: "classic" } })).resolves.toBe(12);
+    await expect(devLink.requestSync()).resolves.toBe(11);
+  });
+
+  it("is allowed to talk to a simulator only in the lab build", async () => {
+    const { devLinkLabBuild } = await load();
+    expect(devLinkLabBuild()).toBe(true);
+    labBuild.allowed = false;
+    expect(devLinkLabBuild()).toBe(false);
+  });
+
+  it("is not allowed to talk to a simulator without the native module", async () => {
+    availability.available = false;
+    vi.resetModules();
+    const { devLinkLabBuild } = await load();
+    expect(devLinkLabBuild()).toBe(false);
   });
 
   it("reads a customization the simulator reported", async () => {
