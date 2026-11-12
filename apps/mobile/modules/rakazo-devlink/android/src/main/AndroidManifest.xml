@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The development link needs no permission of its own: the app already declares
+  android.permission.INTERNET and the link only talks to a loopback address.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" />
