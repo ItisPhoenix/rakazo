@@ -2,15 +2,17 @@ import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Switch,
   Text,
   TextInput,
-  useColorScheme,
   View,
 } from "react-native";
+import { mobileTokens } from "../../lib/appearance";
+import { translucentColor } from "../../lib/color";
 import type {
   DevLinkAccent,
   DevLinkComplicationKind,
@@ -28,6 +30,7 @@ import {
   watchDevLinkError,
   watchDevLinkState,
 } from "../../lib/devlink";
+import { native, useThemedStyles } from "../../lib/native";
 import type { Choice } from "../../lib/watch-face";
 import {
   ACCENT_CHOICES,
@@ -92,12 +95,8 @@ const PLACEHOLDER_STATE: DevLinkCustomization = {
 };
 
 export default function WatchFaceScreen() {
-  const dark = useColorScheme() !== "light";
-  const foreground = dark ? "#F5FAFA" : "#142A30";
-  const muted = dark ? "#AAB8BF" : "#51666E";
-  const surface = dark ? "#1B252B" : "#FFFFFF";
-  const background = dark ? "#0B1318" : "#F2F7F8";
-  const line = dark ? "#33464D" : "#D0E1E3";
+  const styles = useThemedStyles(createWatchFaceStyles);
+  const tokens = mobileTokens();
 
   const [labBuild, setLabBuild] = useState(false);
   const [link, setLink] = useState<LinkState>(initialLinkState);
@@ -244,24 +243,26 @@ export default function WatchFaceScreen() {
     });
   }
 
-  const button = (label: string, onPress: () => void, disabled = false) => (
+  const button = (label: string, onPress: () => void, disabled = false, secondary = false) => (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ disabled: busy || disabled }}
       onPress={onPress}
       disabled={busy || disabled}
       style={({ pressed }) => [
-        styles.button,
+        secondary ? styles.buttonSecondary : styles.button,
         { opacity: busy || disabled ? 0.4 : pressed ? 0.75 : 1 },
       ]}
     >
-      <Text style={styles.buttonText}>{label}</Text>
+      <Text style={secondary ? styles.buttonSecondaryText : styles.buttonText}>{label}</Text>
     </Pressable>
   );
 
   const card = (title: string, children: ReactNode) => (
-    <View style={[styles.card, { backgroundColor: surface }]}>
-      <Text style={[styles.section, { color: foreground }]}>{title}</Text>
+    <View style={styles.card}>
+      <Text accessibilityRole="header" style={styles.section}>
+        {title}
+      </Text>
       {children}
     </View>
   );
@@ -285,8 +286,8 @@ export default function WatchFaceScreen() {
             style={({ pressed }) => [
               styles.choice,
               {
-                backgroundColor: active ? "#189F9C" : "transparent",
-                borderColor: active ? "#189F9C" : line,
+                backgroundColor: active ? tokens.primary : "transparent",
+                borderColor: active ? tokens.primary : native.separator,
                 opacity: disabled ? 0.4 : pressed ? 0.75 : 1,
               },
             ]}
@@ -294,7 +295,10 @@ export default function WatchFaceScreen() {
             <Text
               style={[
                 styles.choiceText,
-                { color: active ? "#FFFFFF" : foreground, fontWeight: active ? "700" : "500" },
+                {
+                  color: active ? tokens.primaryForeground : native.label,
+                  fontWeight: active ? "700" : "500",
+                },
               ]}
             >
               {option.label}
@@ -313,14 +317,14 @@ export default function WatchFaceScreen() {
   ) => (
     <View style={styles.toggle}>
       <View style={styles.toggleText}>
-        <Text style={{ color: foreground, fontWeight: "600" }}>{label}</Text>
-        <Text style={{ color: muted, fontSize: 12 }}>{detail}</Text>
+        <Text style={{ color: native.label, fontWeight: "600" }}>{label}</Text>
+        <Text style={{ color: native.secondaryLabel, fontSize: 12 }}>{detail}</Text>
       </View>
       <Switch
         accessibilityLabel={label}
         value={value}
         onValueChange={onChange}
-        trackColor={{ true: "#189F9C", false: line }}
+        trackColor={{ true: tokens.primary, false: native.separator }}
         thumbColor="#FFFFFF"
       />
     </View>
@@ -332,42 +336,69 @@ export default function WatchFaceScreen() {
       ? "Not connected"
       : link.status.replaceAll("-", " ");
 
+  const noticeColor = (tone?: "ok" | "warn" | "error" | "info") => {
+    switch (tone) {
+      case "error":
+        return tokens.destructive;
+      case "warn":
+        return tokens.warning ?? tokens.destructive;
+      case "ok":
+        return tokens.primary;
+      default:
+        return native.secondaryLabel;
+    }
+  };
+
   return (
-    <ScrollView style={{ backgroundColor: background }} contentContainerStyle={styles.content}>
-      <View style={[styles.hero, { backgroundColor: surface }]}>
-        <Text style={[styles.eyebrow, { color: "#189F9C" }]}>CHARLIE WRIST LAB</Text>
-        <Text style={[styles.title, { color: foreground }]}>Watch face</Text>
-        <Text style={[styles.body, { color: muted }]}>
+    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      <View style={styles.hero}>
+        <Text style={styles.eyebrow}>CHARLIE WRIST LAB</Text>
+        <Text style={styles.title}>Watch face</Text>
+        <Text style={styles.body}>
           Configure the Rust WatchOS simulator. The simulator keeps the settings and writes them to
           its own file; the physical watch is never written to.
         </Text>
         <View
           style={[
             styles.stateChip,
-            { backgroundColor: connected ? "#103C3A" : dark ? "#303940" : "#E3EAED" },
+            {
+              backgroundColor: connected
+                ? translucentColor(tokens.primary, 0.15)
+                : native.fill,
+            },
           ]}
         >
-          <View style={[styles.dot, { backgroundColor: connected ? "#64E0B7" : "#93A4AE" }]} />
-          <Text style={{ color: connected ? "#8DF4D3" : foreground, fontWeight: "700" }}>
+          <View
+            style={[
+              styles.dot,
+              { backgroundColor: connected ? tokens.primary : native.secondaryLabel },
+            ]}
+          />
+          <Text
+            style={{
+              color: connected ? tokens.primary : native.label,
+              fontWeight: "700",
+            }}
+          >
             {stateLabel}
           </Text>
         </View>
         {link.statusReason ? (
-          <Text style={[styles.body, { color: muted }]}>{link.statusReason}</Text>
+          <Text style={styles.body}>{link.statusReason}</Text>
         ) : null}
       </View>
 
       {!available ? (
         card(
           "1. Simulator link",
-          <Text style={[styles.body, { color: foreground }]}>
+          <Text style={{ color: native.label }}>
             This screen needs an Android build that carries the development link.
           </Text>,
         )
       ) : !labBuild ? (
         card(
           "1. Simulator link",
-          <Text style={[styles.body, { color: foreground }]}>
+          <Text style={{ color: native.label }}>
             The development link only works in the Charlie Wrist Lab build.
           </Text>,
         )
@@ -376,11 +407,11 @@ export default function WatchFaceScreen() {
           {card(
             "1. Simulator link",
             <>
-              <Text style={[styles.body, { color: muted }]}>
+              <Text style={styles.body}>
                 The simulator listens on the loopback interface of the computer that runs it. On a
                 device the tunnel is made with `adb reverse tcp:4599 tcp:4599`.
               </Text>
-              <Text style={[styles.label, { color: foreground }]}>Host</Text>
+              <Text style={styles.label}>Host</Text>
               <TextInput
                 accessibilityLabel="Host"
                 value={host}
@@ -388,20 +419,20 @@ export default function WatchFaceScreen() {
                 autoCapitalize="none"
                 autoCorrect={false}
                 placeholder={DEFAULT_HOST}
-                placeholderTextColor={muted}
-                style={[styles.input, { color: foreground, borderColor: line }]}
+                placeholderTextColor={native.secondaryLabel}
+                style={styles.input}
               />
-              <Text style={[styles.label, { color: foreground }]}>Port</Text>
+              <Text style={styles.label}>Port</Text>
               <TextInput
                 accessibilityLabel="Port"
                 value={port}
                 onChangeText={setPort}
                 keyboardType="number-pad"
                 placeholder={DEFAULT_PORT}
-                placeholderTextColor={muted}
-                style={[styles.input, { color: foreground, borderColor: line }]}
+                placeholderTextColor={native.secondaryLabel}
+                style={styles.input}
               />
-              <Text style={[styles.label, { color: foreground }]}>Session token</Text>
+              <Text style={styles.label}>Session token</Text>
               <TextInput
                 accessibilityLabel="Session token"
                 value={token}
@@ -411,23 +442,28 @@ export default function WatchFaceScreen() {
                 autoCorrect={false}
                 autoComplete="off"
                 placeholder="the token the simulator was started with"
-                placeholderTextColor={muted}
-                style={[styles.input, { color: foreground, borderColor: line }]}
+                placeholderTextColor={native.secondaryLabel}
+                style={styles.input}
               />
-              <Text style={[styles.body, { color: muted, fontSize: 12 }]}>
+              <Text style={[styles.body, { fontSize: 12 }]}>
                 The token stays in memory while this screen is open. It is never written to disk and
                 never logged.
               </Text>
               {button(connected ? "Reconnect" : "Connect", () => void connect(), busy)}
-              {button("Disconnect", () => void run(() => devLink.disconnect()), !connected)}
-              {button("Sync now", () => void sync(), !connected)}
+              {button(
+                "Disconnect",
+                () => void run(() => devLink.disconnect()),
+                !connected,
+                true,
+              )}
+              {button("Sync now", () => void sync(), !connected, true)}
             </>,
           )}
 
           {card(
             "2. Watch face",
             <>
-              <Text style={[styles.body, { color: muted }]}>
+              <Text style={styles.body}>
                 The four faces the simulator draws.
               </Text>
               {choice(
@@ -446,7 +482,7 @@ export default function WatchFaceScreen() {
           {card(
             "3. Colour palette",
             <>
-              <Text style={[styles.body, { color: muted }]}>
+              <Text style={styles.body}>
                 The five palettes the simulator draws.
               </Text>
               {choice(
@@ -465,7 +501,7 @@ export default function WatchFaceScreen() {
           {card(
             "4. Display",
             <>
-              <Text style={[styles.body, { color: muted }]}>Glow</Text>
+              <Text style={styles.body}>Glow</Text>
               <View style={styles.glow}>
                 <Pressable
                   accessibilityRole="button"
@@ -477,9 +513,9 @@ export default function WatchFaceScreen() {
                       edits: setEdit(link.edits, "glow", Math.max(0, glowValue - GLOW_STEP)),
                     })
                   }
-                  style={[styles.glowButton, { borderColor: line, opacity: connected ? 1 : 0.4 }]}
+                  style={[styles.glowButton, { opacity: connected ? 1 : 0.4 }]}
                 >
-                  <Text style={{ color: foreground, fontSize: 18 }}>−</Text>
+                  <Text style={{ color: native.label, fontSize: 18 }}>−</Text>
                 </Pressable>
                 <View style={styles.glowBar}>
                   <View
@@ -487,13 +523,12 @@ export default function WatchFaceScreen() {
                       styles.glowFill,
                       {
                         width: `${glowValue}%`,
-                        backgroundColor: "#189F9C",
                         opacity: connected ? 1 : 0.4,
                       },
                     ]}
                   />
                 </View>
-                <Text style={[styles.glowValue, { color: foreground }]}>{glowValue}</Text>
+                <Text style={styles.glowValue}>{glowValue}</Text>
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="More glow"
@@ -504,9 +539,9 @@ export default function WatchFaceScreen() {
                       edits: setEdit(link.edits, "glow", Math.min(100, glowValue + GLOW_STEP)),
                     })
                   }
-                  style={[styles.glowButton, { borderColor: line, opacity: connected ? 1 : 0.4 }]}
+                  style={[styles.glowButton, { opacity: connected ? 1 : 0.4 }]}
                 >
-                  <Text style={{ color: foreground, fontSize: 18 }}>+</Text>
+                  <Text style={{ color: native.label, fontSize: 18 }}>+</Text>
                 </Pressable>
               </View>
               {toggle(
@@ -540,13 +575,13 @@ export default function WatchFaceScreen() {
           {card(
             "5. Complications",
             <>
-              <Text style={[styles.body, { color: muted }]}>
+              <Text style={styles.body}>
                 The three slots the watch shows under the time.
               </Text>
               {Array.from({ length: SLOT_COUNT }, (_, slot) => (
-                <View key={slot} style={[styles.slot, { borderColor: line }]}>
-                  <Text style={[styles.slotTitle, { color: foreground }]}>Slot {slot + 1}</Text>
-                  <Text style={[styles.label, { color: muted }]}>Kind</Text>
+                <View key={slot} style={styles.slot}>
+                  <Text style={styles.slotTitle}>Slot {slot + 1}</Text>
+                  <Text style={styles.label}>Kind</Text>
                   {choice(
                     KIND_CHOICES,
                     slotField(link.authoritative ?? PLACEHOLDER_STATE, link.edits, slot, "kind"),
@@ -562,7 +597,7 @@ export default function WatchFaceScreen() {
                       }),
                     !connected,
                   )}
-                  <Text style={[styles.label, { color: muted }]}>Accent</Text>
+                  <Text style={styles.label}>Accent</Text>
                   {choice(
                     ACCENT_CHOICES,
                     slotField(link.authoritative ?? PLACEHOLDER_STATE, link.edits, slot, "accent"),
@@ -573,7 +608,7 @@ export default function WatchFaceScreen() {
                       }),
                     !connected,
                   )}
-                  <Text style={[styles.label, { color: muted }]}>Style</Text>
+                  <Text style={styles.label}>Style</Text>
                   {choice(
                     STYLE_CHOICES,
                     slotField(link.authoritative ?? PLACEHOLDER_STATE, link.edits, slot, "style"),
@@ -628,16 +663,7 @@ export default function WatchFaceScreen() {
               selectable
               style={[
                 styles.notice,
-                {
-                  color:
-                    link.notice.tone === "error"
-                      ? "#CE4E4E"
-                      : link.notice.tone === "warn"
-                        ? "#B4762A"
-                        : link.notice.tone === "ok"
-                          ? "#2E8B70"
-                          : muted,
-                },
+                { color: noticeColor(link.notice.tone) },
               ]}
             >
               {link.notice.text}
@@ -645,80 +671,210 @@ export default function WatchFaceScreen() {
           ) : null}
 
           <View style={styles.actions}>
-            {button("Cancel", () => dispatch({ type: "cancel" }), !changed)}
+            {button("Cancel", () => dispatch({ type: "cancel" }), !changed, true)}
             {button("Apply to simulator", () => void apply(), !changed || !connected)}
           </View>
-          <Text style={[styles.footnote, { color: muted }]}>
+          <Text style={styles.footnote}>
             Apply sends only the values you changed to the simulator, which stores them in its own
             settings file. Cancel discards them.
           </Text>
         </>
       )}
-      {busy ? <ActivityIndicator style={styles.spinner} color="#189F9C" /> : null}
+      {busy ? <ActivityIndicator style={styles.spinner} color={tokens.primary} /> : null}
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  content: { padding: 18, gap: 14, paddingBottom: 44 },
-  hero: { padding: 22, borderRadius: 22, gap: 12 },
-  eyebrow: { fontWeight: "800", letterSpacing: 1.4, fontSize: 12 },
-  title: { fontSize: 29, fontWeight: "800" },
-  section: { fontSize: 18, fontWeight: "800", marginBottom: 6 },
-  body: { fontSize: 14, lineHeight: 21 },
-  card: { padding: 18, gap: 10, borderRadius: 18 },
-  stateChip: {
-    flexDirection: "row",
-    alignSelf: "flex-start",
-    alignItems: "center",
-    padding: 10,
-    borderRadius: 12,
-    gap: 8,
-  },
-  dot: { width: 9, height: 9, borderRadius: 9 },
-  label: { fontSize: 13, fontWeight: "700", marginTop: 4 },
-  input: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 13,
-    paddingVertical: 11,
-    fontSize: 14,
-  },
-  choices: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  choice: { borderWidth: 1, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 13 },
-  choiceText: { fontSize: 13 },
-  toggle: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    paddingVertical: 4,
-  },
-  toggleText: { flex: 1, gap: 2 },
-  glow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  glowButton: {
-    width: 38,
-    height: 38,
-    borderWidth: 1,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  glowBar: { flex: 1, height: 8, borderRadius: 8, backgroundColor: "#2A3A41", overflow: "hidden" },
-  glowFill: { height: 8, borderRadius: 8 },
-  glowValue: { fontSize: 15, fontWeight: "700", width: 34, textAlign: "right" },
-  slot: { borderWidth: 1, borderRadius: 14, padding: 13, gap: 8, marginTop: 4 },
-  slotTitle: { fontSize: 15, fontWeight: "700" },
-  button: {
-    backgroundColor: "#167D7C",
-    paddingVertical: 13,
-    paddingHorizontal: 18,
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  buttonText: { color: "#FFFFFF", fontWeight: "700", fontSize: 14 },
-  actions: { flexDirection: "row", gap: 10 },
-  notice: { fontSize: 13, lineHeight: 19, paddingHorizontal: 4 },
-  spinner: { marginTop: 4 },
-  footnote: { fontSize: 12, lineHeight: 17, paddingHorizontal: 4 },
-});
+function createWatchFaceStyles() {
+  const tokens = mobileTokens();
+  return StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: native.groupedPage,
+    },
+    content: {
+      padding: 16,
+      gap: 14,
+      paddingBottom: 44,
+    },
+    hero: {
+      padding: 20,
+      borderRadius: 16,
+      backgroundColor: native.groupedCell,
+      gap: 12,
+    },
+    eyebrow: {
+      fontWeight: "800",
+      letterSpacing: 1.4,
+      fontSize: 12,
+      color: tokens.primary,
+    },
+    title: {
+      fontSize: 28,
+      fontWeight: "800",
+      color: native.label,
+    },
+    section: {
+      fontSize: 18,
+      fontWeight: "800",
+      marginBottom: 6,
+      color: native.label,
+    },
+    body: {
+      fontSize: 14,
+      lineHeight: 20,
+      color: native.secondaryLabel,
+    },
+    card: {
+      padding: 16,
+      gap: 12,
+      borderRadius: 16,
+      backgroundColor: native.groupedCell,
+    },
+    stateChip: {
+      flexDirection: "row",
+      alignSelf: "flex-start",
+      alignItems: "center",
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 12,
+      gap: 8,
+    },
+    dot: {
+      width: 8,
+      height: 8,
+      borderRadius: 8,
+    },
+    label: {
+      fontSize: 13,
+      fontWeight: "700",
+      marginTop: 4,
+      color: native.label,
+    },
+    input: {
+      borderWidth: 1,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 15,
+      color: native.label,
+      borderColor: native.separator,
+      backgroundColor: native.groupedCell,
+    },
+    choices: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    choice: {
+      borderWidth: 1,
+      borderRadius: 999,
+      paddingVertical: 8,
+      paddingHorizontal: 14,
+    },
+    choiceText: {
+      fontSize: 13,
+    },
+    toggle: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+      paddingVertical: 4,
+    },
+    toggleText: {
+      flex: 1,
+      gap: 2,
+    },
+    glow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+    },
+    glowButton: {
+      width: 40,
+      height: 40,
+      borderWidth: 1,
+      borderRadius: 12,
+      alignItems: "center",
+      justifyContent: "center",
+      borderColor: native.separator,
+    },
+    glowBar: {
+      flex: 1,
+      height: 8,
+      borderRadius: 8,
+      backgroundColor: native.fill,
+      overflow: "hidden",
+    },
+    glowFill: {
+      height: 8,
+      borderRadius: 8,
+      backgroundColor: tokens.primary,
+    },
+    glowValue: {
+      fontSize: 15,
+      fontWeight: "700",
+      width: 34,
+      textAlign: "right",
+      color: native.label,
+    },
+    slot: {
+      borderWidth: 1,
+      borderRadius: 14,
+      padding: 14,
+      gap: 10,
+      marginTop: 4,
+      borderColor: native.separator,
+    },
+    slotTitle: {
+      fontSize: 15,
+      fontWeight: "700",
+      color: native.label,
+    },
+    button: {
+      backgroundColor: tokens.primary,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 12,
+      alignItems: "center",
+    },
+    buttonText: {
+      color: tokens.primaryForeground,
+      fontWeight: "600",
+      fontSize: 14,
+    },
+    buttonSecondary: {
+      backgroundColor: "transparent",
+      borderWidth: 1,
+      borderColor: tokens.border,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 12,
+      alignItems: "center",
+    },
+    buttonSecondaryText: {
+      color: native.label,
+      fontWeight: "600",
+      fontSize: 14,
+    },
+    actions: {
+      flexDirection: "row",
+      gap: 10,
+    },
+    notice: {
+      fontSize: 13,
+      lineHeight: 19,
+      paddingHorizontal: 4,
+    },
+    spinner: {
+      marginTop: 4,
+    },
+    footnote: {
+      fontSize: 12,
+      lineHeight: 18,
+      paddingHorizontal: 4,
+      color: native.secondaryLabel,
+    },
+  });
+}

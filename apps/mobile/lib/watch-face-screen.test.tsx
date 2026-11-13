@@ -39,6 +39,33 @@ vi.mock("expo-modules-core", () => ({
   requireOptionalNativeModule: () => nativeModule,
 }));
 
+vi.mock("./native", () => ({
+  native: {
+    fill: "fill",
+    groupedCell: "grouped-cell",
+    groupedPage: "grouped-page",
+    fillPressed: "fill-pressed",
+    label: "label",
+    secondaryLabel: "secondary-label",
+    tertiaryLabel: "tertiary-label",
+    separator: "separator",
+    cell: "cell",
+  },
+  useThemedStyles: <T,>(factory: () => T) => factory(),
+  useResolvedAppearance: () => "dark",
+  systemGreen: () => "system-green",
+}));
+
+vi.mock("./appearance", () => ({
+  mobileTokens: () => ({
+    primary: "#189F9C",
+    primaryForeground: "#FFFFFF",
+    destructive: "#CE4E4E",
+    border: "#D0E1E3",
+    background: "#0B1318",
+  }),
+}));
+
 vi.mock("react-native", () => {
   function MockView(props: {
     children?: ReactNode;
