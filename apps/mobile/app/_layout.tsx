@@ -33,6 +33,7 @@ import { chatRouteHeader } from "../components/chat-route-header";
 import { CodeCopyButton } from "../components/code-copy-button";
 import { ComputerUpdateProgress } from "../components/computer-update-progress";
 import { floatingHeaderOptions, glassHeaderOptions } from "../components/glass-title";
+import { FindPhoneAlert } from "../components/FindPhoneAlert";
 import { IncomingCall } from "../components/IncomingCall";
 import { MermaidDiagram } from "../components/mermaid-diagram";
 import { MessageMenuHost } from "../components/message-action-menu";
@@ -587,6 +588,7 @@ function LayoutContent() {
               <MessageActionSheetHost />
               <CallCard />
               <IncomingCall />
+              <FindPhoneAlert />
             </ThemeProvider>
           </ChatContentProviders>
         ) : (
