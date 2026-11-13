@@ -77,16 +77,19 @@ class DevLinkClient(private val listener: Listener, private val config: Config =
 
     /** How many requests may wait for an answer at the same time. */
     const val MAX_PENDING = 8
+
+    /** The id a request gets when it was refused before it was sent. */
+    const val NO_REQUEST = -1L
   }
 
   private sealed class Command {
-    class Connect(val host: String, val port: Int, val token: String) : Command()
+    class Connect(val host: String, val port: Int, val token: String, val requestId: Long) : Command()
 
     class Disconnect : Command()
 
-    class Apply(val patchJson: String) : Command()
+    class Apply(val patchJson: String, val requestId: Long) : Command()
 
-    class Sync : Command()
+    class Sync(val requestId: Long) : Command()
   }
 
   private class Pending(
@@ -104,7 +107,6 @@ class DevLinkClient(private val listener: Listener, private val config: Config =
     val reader = FrameReader()
     var token: String? = null
     var handshakeRequestId = 0L
-    var nextRequestId = 0L
     val pending = LinkedHashMap<Long, Pending>()
     var revision: Long? = null
     var customizationJson: String? = null
@@ -127,6 +129,13 @@ class DevLinkClient(private val listener: Listener, private val config: Config =
 
   private val commands = LinkedBlockingQueue<Command>()
   private val running = AtomicBoolean(false)
+
+  /**
+   * The ids of every request the client sends.
+   *
+   * One counter for the whole client keeps the ids unique across sessions,
+   * and lets the caller learn which id a request got.
+   */
   private val requestCounter = AtomicLong(0)
   private var worker: Thread? = null
 
@@ -145,23 +154,30 @@ class DevLinkClient(private val listener: Listener, private val config: Config =
     listener.onState(status, reason)
   }
 
-  /** Start the client. Calling it again replaces the running session. */
-  fun connect(host: String, port: Int, token: String) {
+  /**
+   * Start the client. Calling it again replaces the running session.
+   *
+   * The returned id is the handshake's request id, so a caller can tell the
+   * handshake apart from the requests that follow it.
+   */
+  fun connect(host: String, port: Int, token: String): Long {
     if (host.isBlank()) {
       listener.onError("invalid_host", "the development link host must not be empty", null)
-      return
+      return NO_REQUEST
     }
     if (port <= 0 || port > 65535) {
       listener.onError("invalid_port", "the development link port must be between 1 and 65535", null)
-      return
+      return NO_REQUEST
     }
     if (token.isEmpty()) {
       listener.onError("invalid_token", "the development link needs a session token", null)
-      return
+      return NO_REQUEST
     }
     commands.clear()
-    commands.offer(Command.Connect(host, port, token))
+    val requestId = nextRequestId()
+    commands.offer(Command.Connect(host, port, token, requestId))
     startWorker()
+    return requestId
   }
 
   /** Stop the client and release the socket. */
@@ -173,10 +189,17 @@ class DevLinkClient(private val listener: Listener, private val config: Config =
     worker?.interrupt()
   }
 
-  /** Ask the simulator for the committed customization. */
-  fun requestSync() {
-    commands.offer(Command.Sync())
+  /**
+   * Ask the simulator for the committed customization.
+   *
+   * The returned id belongs to the request, so the caller can tell this
+   * answer apart from the answer to a change.
+   */
+  fun requestSync(): Long {
+    val requestId = nextRequestId()
+    commands.offer(Command.Sync(requestId))
     startWorker()
+    return requestId
   }
 
   /**
@@ -184,10 +207,15 @@ class DevLinkClient(private val listener: Listener, private val config: Config =
    *
    * The change is applied on top of the last state the simulator reported, so
    * a partial change never clears the parts it does not mention.
+   *
+   * The returned id belongs to the request, so the caller can match the
+   * simulator's answer to this change.
    */
-  fun applyCustomization(patchJson: String) {
-    commands.offer(Command.Apply(patchJson))
+  fun applyCustomization(patchJson: String): Long {
+    val requestId = nextRequestId()
+    commands.offer(Command.Apply(patchJson, requestId))
     startWorker()
+    return requestId
   }
 
   /** True once the simulator acknowledged the handshake. */
@@ -282,7 +310,7 @@ class DevLinkClient(private val listener: Listener, private val config: Config =
           fresh.input = BufferedInputStream(socket.getInputStream())
           fresh.output = BufferedOutputStream(socket.getOutputStream())
           fresh.token = command.token
-          fresh.handshakeRequestId = nextRequestId(fresh)
+          fresh.handshakeRequestId = command.requestId
           emitState(STATUS_AUTHENTICATING, null)
           send(fresh, DevLinkProtocol.handshake(fresh.handshakeRequestId, command.token))
           fresh
@@ -309,7 +337,7 @@ class DevLinkClient(private val listener: Listener, private val config: Config =
           listener.onError("not_connected", "the development link is not connected", null)
           return session
         }
-        val requestId = nextRequestId(current)
+        val requestId = command.requestId
         val frame = encode(DevLinkProtocol.hello(requestId))
         if (frame == null) return session
         send(current, frame)
@@ -340,7 +368,7 @@ class DevLinkClient(private val listener: Listener, private val config: Config =
             return session
           }
         val customization = DevLinkProtocol.mergeCustomization(JSONObject(known), patch)
-        val requestId = nextRequestId(current)
+        val requestId = command.requestId
         val frame = encode(DevLinkProtocol.customization(requestId, revision, customization))
         if (frame == null) return session
         send(current, frame)
@@ -360,10 +388,7 @@ class DevLinkClient(private val listener: Listener, private val config: Config =
     }
   }
 
-  private fun nextRequestId(session: Session): Long {
-    session.nextRequestId += 1
-    return session.nextRequestId
-  }
+  private fun nextRequestId(): Long = requestCounter.incrementAndGet()
 
   private fun register(session: Session, requestId: Long, frame: ByteArray, kind: String) {
     if (session.pending.size >= config.maxPending) {

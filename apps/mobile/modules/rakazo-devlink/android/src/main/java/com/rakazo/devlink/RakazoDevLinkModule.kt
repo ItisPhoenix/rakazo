@@ -28,6 +28,9 @@ class RakazoDevLinkModule : Module() {
       require(token.isNotEmpty()) { "the development link needs a session token" }
       val link = client ?: DevLinkClient(listener()).also { client = it }
       link.connect(host, port, token)
+      // The handshake is answered by the link itself, so there is nothing to
+      // hand back to the caller.
+      Unit
     }
 
     AsyncFunction("disconnect") {
@@ -36,13 +39,21 @@ class RakazoDevLinkModule : Module() {
 
     AsyncFunction("requestSync") {
       require(labBuild()) { "the development link is only available in the Charlie Wrist Lab build" }
-      client?.requestSync()
+      client?.requestSync() ?: DevLinkClient.NO_REQUEST
     }
 
     AsyncFunction("applyCustomization") { patchJson: String ->
       require(labBuild()) { "the development link is only available in the Charlie Wrist Lab build" }
-      client?.applyCustomization(patchJson)
+      client?.applyCustomization(patchJson) ?: DevLinkClient.NO_REQUEST
     }
+
+    /**
+     * Whether this build may talk to a development simulator.
+     *
+     * The answer is a plain fact about the running build, so the user interface
+     * can hide the development link instead of offering a button that fails.
+     */
+    Function("isLabBuild") { labBuild() }
 
     AsyncFunction("currentState") {
       mapOf(
@@ -62,7 +73,7 @@ class RakazoDevLinkModule : Module() {
   /** The lab build is the only build allowed to talk to a development simulator. */
   private fun labBuild(): Boolean {
     val context = appContext.reactContext ?: return false
-    return context.packageName == LAB_PACKAGE
+    return DevLinkLab.isLabPackage(context.packageName)
   }
 
   private fun listener() =
@@ -93,8 +104,4 @@ class RakazoDevLinkModule : Module() {
         main.post { sendEvent("onDevLinkError", payload) }
       }
     }
-
-  private companion object {
-    const val LAB_PACKAGE = "com.rakazo.charliewristlab"
-  }
 }
